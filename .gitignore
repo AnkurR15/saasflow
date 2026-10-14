@@ -1,0 +1,34 @@
+# Root dependencies and package-manager state
+node_modules/
+.pnpm-store/
+
+# Turborepo and build output
+.turbo/
+.next/
+dist/
+build/
+out/
+coverage/
+
+# Local environment and secrets
+.env
+.env.*
+!.env.example
+
+# TypeScript/build caches
+*.tsbuildinfo
+
+# Logs and OS files
+*.log
+npm-debug.log*
+yarn-debug.log*
+pnpm-debug.log*
+.DS_Store
+Thumbs.db
+
+# Local editor files
+.idea/
+.vscode/
+
+# Generated Prisma client (the schema and migrations are tracked)
+packages/db/generated/prisma/

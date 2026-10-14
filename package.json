@@ -1,0 +1,12 @@
+{
+    "name": "saasflow",
+    "packageManager": "pnpm@10.12.1",
+    "private": true,
+    "scripts": {
+        "dev": "turbo dev",
+        "build": "turbo build"
+    },
+    "devDependencies": {
+        "turbo": "^2.10.12"
+    }
+}
