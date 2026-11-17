@@ -35,6 +35,16 @@ test("cleanup removes old payloads and orphan directories but preserves active a
     });
     for (const id of [expired.id, revoked.id, orphan]) await assert.rejects(stat(path.join(root, id)), { code: "ENOENT" });
     for (const id of [active.id, recent.id]) assert.equal((await stat(path.join(root, id))).isDirectory(), true);
+    for (const id of [expired.id, revoked.id]) assert.ok((await prisma.secureShare.findUniqueOrThrow({ where: { id } })).storageReleasedAt);
+    for (const id of [active.id, recent.id]) assert.equal((await prisma.secureShare.findUniqueOrThrow({ where: { id } })).storageReleasedAt, null);
+
+    const failed = await prisma.secureShare.create({ data: { ...base, revokedAt: old } });
+    const invalidRoot = path.join(root, "not-a-directory");
+    await writeFile(invalidRoot, "not a directory");
+    await assert.rejects(promisify(execFile)(process.execPath, [require.resolve("tsx/cli"), path.join(repoRoot, "packages/db/src/secure-drop-cleanup.ts")], {
+      cwd: path.join(repoRoot, "packages/db"), env: { ...process.env, DATABASE_URL: process.env.SECURE_DROP_TEST_DATABASE_URL, SECURE_DROP_STORAGE_DIR: invalidRoot },
+    }));
+    assert.equal((await prisma.secureShare.findUniqueOrThrow({ where: { id: failed.id } })).storageReleasedAt, null);
   } finally {
     await prisma.organization.delete({ where: { id: organization.id } });
     await prisma.$disconnect();

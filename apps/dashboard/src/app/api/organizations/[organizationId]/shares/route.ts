@@ -31,10 +31,12 @@ export async function POST(request: Request, context: Context) {
       const active = { organizationId, revokedAt: null, expiresAt: { gt: now } };
       const [count, reserved] = await Promise.all([
         tx.secureShare.count({ where: active }),
-        tx.secureShareFile.aggregate({ where: { share: active }, _sum: { size: true } }),
+        // Retain reservations for revoked and expired shares until cleanup has
+        // actually removed their payloads, including the download grace period.
+        tx.secureShareFile.aggregate({ where: { share: { organizationId, storageReleasedAt: null } }, _sum: { size: true } }),
       ]);
       if (count >= 20) throw new DropError(409, "This organization has 20 active shares or uploads. Revoke a share or try later.");
-      if ((reserved._sum.size ?? BigInt(0)) + total > BigInt(MAX_ORGANIZATION_BYTES)) throw new DropError(409, "The organization has reached its 50 GiB active storage limit.");
+      if ((reserved._sum.size ?? BigInt(0)) + total > BigInt(MAX_ORGANIZATION_BYTES)) throw new DropError(409, "The organization has reached its 50 GiB storage reservation limit. Revoked and expired shares count until their files are cleaned up.");
       return tx.secureShare.create({ data: {
         organizationId, createdById: member.userId, projectId: (input.projectId as string) || null,
         expiryHours: Number(input.hours), downloadOnce: input.downloadOnce as boolean,
