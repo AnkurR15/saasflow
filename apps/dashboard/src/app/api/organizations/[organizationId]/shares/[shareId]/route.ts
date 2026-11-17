@@ -12,6 +12,8 @@ export async function POST(request: Request, context: Context) {
     const member = await authorizeShare(request, organizationId);
     const token = newToken();
     await prisma.$transaction(async tx => {
+      // Use the same lock order as reservation creation before extending expiry.
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`secure-share-org:${organizationId}`}))`;
       await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`secure-share:${shareId}`}))`;
       const share = await tx.secureShare.findFirst({ where: { id: shareId, organizationId, createdById: member.userId, revokedAt: null, publishedAt: null, expiresAt: { gt: new Date() } }, include: { files: true } });
       if (!share) throw new DropError(404, "Upload not found or no longer available.");

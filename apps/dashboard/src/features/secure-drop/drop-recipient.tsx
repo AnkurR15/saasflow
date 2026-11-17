@@ -21,23 +21,24 @@ export function DropRecipient() {
     } catch (error) { if (window.location.hash.slice(1) === value) { setDetails(null); setMessage(error instanceof Error ? error.message : "Could not open this share."); } }
   }, []);
   useEffect(() => {
-    const update = () => { const value = window.location.hash.slice(1); setToken(value); setDetails(null); setMessage("Loading share…"); void load(value); };
+    const update = () => { const value = window.location.hash.slice(1); setToken(value); setBusy(false); setDetails(null); setMessage("Loading share…"); void load(value); };
     update(); window.addEventListener("hashchange", update);
     return () => window.removeEventListener("hashchange", update);
   }, [load]);
 
   async function legacyDownload() {
+    const downloadToken = token;
     setBusy(true); setMessage("");
     try {
-      const response = await fetch("/api/secure-drop/download", { method: "POST", headers: { "Content-Type": "text/plain" }, body: token });
+      const response = await fetch("/api/secure-drop/download", { method: "POST", headers: { "Content-Type": "text/plain" }, body: downloadToken });
       if (!response.ok) throw new Error((await response.json()).error);
       const blob = await response.blob();
       const url = URL.createObjectURL(blob);
       const anchor = document.createElement("a"); anchor.href = url; anchor.download = details?.files[0]?.path || "download";
       document.body.appendChild(anchor); anchor.click(); anchor.remove(); setTimeout(() => URL.revokeObjectURL(url), 60_000);
-      setDetails(null); setMessage("Download started. This link has now been consumed.");
-    } catch (error) { setMessage(error instanceof Error ? error.message : "Download failed."); }
-    finally { setBusy(false); }
+      if (window.location.hash.slice(1) === downloadToken) { setDetails(null); setMessage("Download started. This link has now been consumed."); }
+    } catch (error) { if (window.location.hash.slice(1) === downloadToken) setMessage(error instanceof Error ? error.message : "Download failed."); }
+    finally { if (window.location.hash.slice(1) === downloadToken) setBusy(false); }
   }
 
   return <main className="mx-auto max-w-3xl space-y-6 px-4 py-12 sm:px-6 sm:py-20">

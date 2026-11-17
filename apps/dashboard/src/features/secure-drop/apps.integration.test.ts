@@ -118,6 +118,20 @@ test("built apps serve pages and enforce Secure Drop and admin authorization ove
     assert.equal(maximum.status, 201);
     const maximumId = (await maximum.json()).id;
     assert.equal((await fetch(`${shares}/${maximumId}`, { method: "DELETE", headers: { origin, cookie: member } })).status, 204);
+    const expiring = await prisma.secureShare.create({ data: {
+      organizationId: org.id, createdById: userIds[0], expiryHours: 24, expiresAt: new Date(Date.now() + 60_000),
+      files: { create: { path: "pending.txt", size: 1, uploadedSize: 1 } },
+    } });
+    let pendingPublish: Promise<Response> | undefined;
+    let completed = false;
+    await prisma.$transaction(async tx => {
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`secure-share-org:${org.id}`}))`;
+      pendingPublish = fetch(`${shares}/${expiring.id}`, { method: "POST", headers: { origin, cookie: member } }).then(response => { completed = true; return response; });
+      await new Promise(resolve => setTimeout(resolve, 300));
+      assert.equal(completed, false, "publication must wait for the organization reservation lock");
+      await tx.secureShare.update({ where: { id: expiring.id }, data: { expiresAt: new Date(Date.now() - 1000) } });
+    });
+    assert.equal((await pendingPublish!).status, 404, "an expired draft cannot be published after the reservation lock is released");
     const created = await create(manifest);
     assert.equal(created.status, 201);
     const draft = await created.json();

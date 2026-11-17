@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { randomBytes, randomUUID } from "node:crypto";
 import { encryptFile, hashToken, newToken } from "./crypto";
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { writeChunk } from "./storage";
@@ -80,7 +80,11 @@ test("browser form downloads work with a null Origin while rejecting cross-site 
       files: { create: { path: "folder/file.txt", size: bytes.length, uploadedSize: bytes.length } },
     }, include: { files: true } });
     const file = share.files[0];
-    await writeChunk(share.id, file.id, 0, bytes);
+    const storageKey = await writeChunk(share.id, file.id, 0, bytes);
+    await prisma.secureShareChunk.create({ data: { fileId: file.id, index: 0, storageKey } });
+    // A stalled attempt that finishes after the commit must not change the
+    // bytes selected by the database reference.
+    await writeChunk(share.id, file.id, 0, Buffer.from("different bytes"));
     const submit = (site: string) => POST(new Request("https://drop.example.test/api/secure-drop/file", {
       method: "POST", headers: { origin: "null", "sec-fetch-site": site, "content-type": "application/x-www-form-urlencoded" },
       body: new URLSearchParams({ token, fileId: file.id }),
@@ -90,6 +94,25 @@ test("browser form downloads work with a null Origin while rejecting cross-site 
     assert.equal(response.status, 200);
     assert.deepEqual(Buffer.from(await response.arrayBuffer()), bytes);
     assert.equal((await submit("same-origin")).status, 404);
+
+    // Shares uploaded before the migration have no chunk rows and use the
+    // original index-only filename.
+    const oldToken = newToken();
+    const oldShare = await prisma.secureShare.create({ data: {
+      organizationId: organization.id, createdById: "test-user", tokenHash: hashToken(oldToken), downloadOnce: false,
+      expiryHours: 1, publishedAt: new Date(), expiresAt: new Date(Date.now() + 60_000),
+      files: { create: { path: "legacy.txt", size: bytes.length, uploadedSize: bytes.length } },
+    }, include: { files: true } });
+    const oldFile = oldShare.files[0];
+    const oldDirectory = path.join(storage, oldShare.id, oldFile.id);
+    await mkdir(oldDirectory, { recursive: true });
+    await writeFile(path.join(oldDirectory, "0.chunk"), encryptFile(bytes, `${oldShare.id}:${oldFile.id}:0`));
+    const oldResponse = await POST(new Request("https://drop.example.test/api/secure-drop/file", {
+      method: "POST", headers: { origin: "null", "sec-fetch-site": "same-origin" },
+      body: new URLSearchParams({ token: oldToken, fileId: oldFile.id }),
+    }));
+    assert.equal(oldResponse.status, 200);
+    assert.deepEqual(Buffer.from(await oldResponse.arrayBuffer()), bytes);
   } finally {
     await prisma.organization.delete({ where: { id: organization.id } });
     await prisma.$disconnect();

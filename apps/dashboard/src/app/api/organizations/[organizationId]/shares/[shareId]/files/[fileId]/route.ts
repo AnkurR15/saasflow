@@ -24,11 +24,13 @@ export async function PUT(request: Request, context: Context) {
       // A response can be lost after the chunk was committed. Accept an exact
       // retry, but never let a retry replace data already acknowledged.
       if (remaining > 0 && bytes.length === expected && file.uploadedSize >= offset + BigInt(expected)) {
-        if (!(await readChunk(shareId, fileId, index)).equals(bytes)) throw new DropError(409, "The uploaded chunk does not match the earlier upload.");
+        const chunk = await tx.secureShareChunk.findUnique({ where: { fileId_index: { fileId, index } } });
+        if (!(await readChunk(shareId, fileId, index, chunk?.storageKey)).equals(bytes)) throw new DropError(409, "The uploaded chunk does not match the earlier upload.");
         return;
       }
       if (file.uploadedSize !== offset || remaining <= 0 || bytes.length !== expected) throw new DropError(409, "Upload chunk is out of order or has an invalid size.");
-      await writeChunk(shareId, fileId, index, bytes);
+      const storageKey = await writeChunk(shareId, fileId, index, bytes);
+      await tx.secureShareChunk.create({ data: { fileId, index, storageKey } });
       await tx.secureShareFile.update({ where: { id: file.id }, data: { uploadedSize: { increment: bytes.length } } });
     }, { timeout: 30_000 });
     return new Response(null, { status: 204, headers: privateHeaders });

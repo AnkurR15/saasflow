@@ -13,6 +13,7 @@ function sendChunk(url: string, blob: Blob, index: number, progress: (bytes: num
   return new Promise<void>((resolve, reject) => {
     const xhr = new XMLHttpRequest();
     xhr.open("PUT", url);
+    xhr.timeout = 5 * 60_000;
     xhr.setRequestHeader("Content-Type", "application/octet-stream");
     xhr.setRequestHeader("x-chunk-index", String(index));
     xhr.upload.onprogress = event => { if (event.lengthComputable) progress(event.loaded); };
@@ -21,6 +22,7 @@ function sendChunk(url: string, blob: Blob, index: number, progress: (bytes: num
       else { let message = "Upload failed."; try { message = JSON.parse(xhr.responseText).error || message; } catch { /* keep default */ } reject(Object.assign(new Error(message), { retryable: xhr.status >= 500 })); }
     };
     xhr.onerror = () => reject(Object.assign(new Error("Upload interrupted. Please try again."), { retryable: true }));
+    xhr.ontimeout = () => reject(Object.assign(new Error("Upload timed out. Please try again."), { retryable: true }));
     xhr.send(blob);
   });
 }

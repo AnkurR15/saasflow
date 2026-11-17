@@ -14,7 +14,7 @@ const features = [
   {
     icon: FileLock2,
     title: "Secure Drop",
-    description: "Share files up to 5 MiB using expiring, one-time links. Revoke access before download. Files are encrypted on the server.",
+    description: "Share files up to 5 GiB using expiring links with one-time or repeat downloads. Files are encrypted on the server.",
   },
   {
     icon: Building2,

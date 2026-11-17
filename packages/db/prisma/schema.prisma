@@ -136,7 +136,17 @@ model SecureShareFile {
   downloadedAt DateTime?
   downloadCount Int     @default(0)
   share        SecureShare @relation(fields: [shareId], references: [id], onDelete: Cascade)
+  chunks       SecureShareChunk[]
 
   @@unique([shareId, path])
   @@index([shareId])
+}
+
+model SecureShareChunk {
+  fileId     String
+  index      Int
+  storageKey String
+  file       SecureShareFile @relation(fields: [fileId], references: [id], onDelete: Cascade)
+
+  @@id([fileId, index])
 }
