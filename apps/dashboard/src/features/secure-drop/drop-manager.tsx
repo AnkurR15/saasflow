@@ -2,30 +2,13 @@
 
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { sendChunk } from "./chunk-upload";
 
 type Drop = { id: string; title: string; size: number; expiresAt: string; status: string; canRevoke: boolean; project?: string; sender: string; mode: string; legacy: boolean; downloads: number };
 type Selected = { file: File; path: string };
 const button = "rounded-md bg-primary px-4 py-2 text-primary-foreground disabled:opacity-50";
 const CHUNK_BYTES = 4 * 1024 * 1024;
 function formatSize(size: number) { return size >= 1024 ** 3 ? `${(size / 1024 ** 3).toFixed(2)} GiB` : size >= 1024 ** 2 ? `${(size / 1024 ** 2).toFixed(1)} MiB` : `${(size / 1024).toFixed(1)} KiB`; }
-
-function sendChunk(url: string, blob: Blob, index: number, progress: (bytes: number) => void) {
-  return new Promise<void>((resolve, reject) => {
-    const xhr = new XMLHttpRequest();
-    xhr.open("PUT", url);
-    xhr.timeout = 5 * 60_000;
-    xhr.setRequestHeader("Content-Type", "application/octet-stream");
-    xhr.setRequestHeader("x-chunk-index", String(index));
-    xhr.upload.onprogress = event => { if (event.lengthComputable) progress(event.loaded); };
-    xhr.onload = () => {
-      if (xhr.status >= 200 && xhr.status < 300) resolve();
-      else { let message = "Upload failed."; try { message = JSON.parse(xhr.responseText).error || message; } catch { /* keep default */ } reject(Object.assign(new Error(message), { retryable: xhr.status >= 500 })); }
-    };
-    xhr.onerror = () => reject(Object.assign(new Error("Upload interrupted. Please try again."), { retryable: true }));
-    xhr.ontimeout = () => reject(Object.assign(new Error("Upload timed out. Please try again."), { retryable: true }));
-    xhr.send(blob);
-  });
-}
 
 async function uploadChunk(url: string, blob: Blob, index: number, progress: (bytes: number) => void) {
   for (let attempt = 0; ; attempt++) {

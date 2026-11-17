@@ -125,12 +125,25 @@ test("built apps serve pages and enforce Secure Drop and admin authorization ove
     let pendingPublish: Promise<Response> | undefined;
     let completed = false;
     await prisma.$transaction(async tx => {
+      const [{ pid }] = await tx.$queryRaw<{ pid: number }[]>`SELECT pg_backend_pid() AS pid`;
       await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`secure-share-org:${org.id}`}))`;
       pendingPublish = fetch(`${shares}/${expiring.id}`, { method: "POST", headers: { origin, cookie: member } }).then(response => { completed = true; return response; });
-      await new Promise(resolve => setTimeout(resolve, 300));
+      const deadline = Date.now() + 5_000;
+      let waiting = false;
+      while (!waiting && !completed && Date.now() < deadline) {
+        const [result] = await prisma.$queryRaw<{ waiting: boolean }[]>`
+          SELECT EXISTS (
+            SELECT 1 FROM pg_locks
+            WHERE locktype = 'advisory' AND NOT granted
+              AND ${pid}::int = ANY(pg_blocking_pids(pid))
+          ) AS waiting`;
+        waiting = result.waiting;
+        if (!waiting) await new Promise(resolve => setTimeout(resolve, 25));
+      }
+      assert.equal(waiting, true, "publication must be waiting on this transaction's advisory lock");
       assert.equal(completed, false, "publication must wait for the organization reservation lock");
       await tx.secureShare.update({ where: { id: expiring.id }, data: { expiresAt: new Date(Date.now() - 1000) } });
-    });
+    }, { timeout: 10_000 });
     assert.equal((await pendingPublish!).status, 404, "an expired draft cannot be published after the reservation lock is released");
     const created = await create(manifest);
     assert.equal(created.status, 201);

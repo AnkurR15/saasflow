@@ -13,7 +13,7 @@
   "scripts": {
     "db:generate": "prisma generate",
     "db:drop-cleanup": "tsx src/secure-drop-cleanup.ts",
-    "test:secure-drop": "tsx --test ../../apps/dashboard/src/features/secure-drop/secure-drop.test.ts ../../apps/dashboard/src/features/auth/redirect.test.ts ../../apps/admin/src/features/auth/admin-policy.test.ts",
+    "test:secure-drop": "tsx --test ../../apps/dashboard/src/features/secure-drop/secure-drop.test.ts ../../apps/dashboard/src/features/secure-drop/chunk-upload.test.ts ../../apps/dashboard/src/features/auth/redirect.test.ts ../../apps/admin/src/features/auth/admin-policy.test.ts",
     "test:secure-drop:integration": "tsx --tsconfig ../../apps/dashboard/tsconfig.json --test ../../apps/dashboard/src/features/secure-drop/*.integration.test.ts",
     "db:migrate": "prisma migrate dev",
     "db:studio": "prisma studio",
