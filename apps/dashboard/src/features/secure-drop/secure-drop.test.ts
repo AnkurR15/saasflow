@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { randomBytes } from "node:crypto";
 import { decryptFile, encryptFile, hashToken, newToken, TOKEN_PATTERN } from "./crypto";
-import { DropError, readLimited, sameOrigin } from "./http";
+import { DropError, parseFileName, readLimited, sameOrigin } from "./http";
 
 test("encrypted files round-trip; tampering and cross-drop substitution fail", () => {
   process.env.SECURE_DROP_ENCRYPTION_KEY = randomBytes(32).toString("hex");
@@ -50,5 +50,33 @@ test("mutations reject cross-origin and missing Origin headers", () => {
   } finally {
     if (previous === undefined) delete process.env.SECURE_DROP_APP_ORIGIN;
     else process.env.SECURE_DROP_APP_ORIGIN = previous;
+  }
+});
+
+test("filenames reject traversal, malformed encoding and disguised extensions", () => {
+  for (const name of ["", " ", ".", "..", "../file", "a\\b", "a\n.txt", "photo\u202egnp.exe", "a\u2066.txt", "x".repeat(181)]) {
+    assert.throws(() => parseFileName(encodeURIComponent(name)), (error: unknown) => error instanceof DropError && error.status === 400);
+  }
+  assert.throws(() => parseFileName("%ZZ"));
+  assert.equal(parseFileName(encodeURIComponent("résumé.pdf")), "résumé.pdf");
+  assert.equal(parseFileName(encodeURIComponent("report (final).pdf")), "report (final).pdf");
+});
+
+test("production origin configuration fails closed", () => {
+  const previous = { ...process.env };
+  try {
+    Object.assign(process.env, { NODE_ENV: "production" });
+    for (const origin of [undefined, "http://example.test", "https://example.test/path", "https://example.test/"]) {
+      if (origin === undefined) delete process.env.SECURE_DROP_APP_ORIGIN;
+      else process.env.SECURE_DROP_APP_ORIGIN = origin;
+      assert.throws(() => sameOrigin(new Request("https://example.test", { headers: { origin: "https://example.test" } })));
+    }
+    process.env.SECURE_DROP_APP_ORIGIN = "https://example.test";
+    assert.doesNotThrow(() => sameOrigin(new Request("http://internal:3001", { headers: { origin: "https://example.test" } })));
+  } finally {
+    for (const name of ["NODE_ENV", "SECURE_DROP_APP_ORIGIN"]) {
+      if (previous[name] === undefined) delete process.env[name];
+      else process.env[name] = previous[name];
+    }
   }
 });

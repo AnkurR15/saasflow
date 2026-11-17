@@ -62,6 +62,15 @@ Encryption key rotation requires a migration strategy for active files.
 Apply ingress request/concurrency limits before exposing this publicly; the
 per-file and per-organization quotas do not replace service-wide rate limits.
 
+Production now requires an explicit HTTPS `SECURE_DROP_APP_ORIGIN`; a missing
+setting, HTTP origin, trailing slash, or path fails closed. Local development
+still supports HTTP. Filenames reject path separators, control characters and
+Unicode direction overrides. The dashboard prevents framing and suppresses
+referrers; the recipient page also requests no indexing.
+
+See [project readiness and resume guidance](project-readiness.md) for the
+verification checklist, public-launch priorities, and accurate portfolio claims.
+
 ## Tailscale and Go
 
 No Tailcat integration existed in the source branch. If “tailcat” means

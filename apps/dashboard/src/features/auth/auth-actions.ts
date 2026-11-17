@@ -6,6 +6,9 @@ import { authServerSchema } from "./auth-schema.server";
 import { ActionResult } from "@repo/types";
 import { retrieveUserFromDatabaseByEmail, saveUserToDatabase } from "./auth-model";
 import { hashPassword, verifyPassword } from "./auth-helpers.server";
+import { safeRedirect } from "./redirect";
+import { AuthError } from "next-auth";
+import { Prisma } from "@repo/db";
 
 export async function authAction(
     _previous: ActionResult,
@@ -37,13 +40,16 @@ export async function authAction(
                 error: "Invalid email or password"
             }
 
-            await signIn("credentials", {
+            try { await signIn("credentials", {
                 email: normalizedEmail,
                 password,
                 redirect: false
-            })
+            }) } catch (error) {
+                if (error instanceof AuthError) return { error: "Invalid email or password" };
+                throw error;
+            }
 
-            redirect("/dashboard")
+            redirect(safeRedirect(formData.get("redirectTo")))
         }
 
         case "sign-up": {
@@ -62,10 +68,15 @@ export async function authAction(
 
             const hashedPassword = await hashPassword(password)
 
-            await saveUserToDatabase({
+            try { await saveUserToDatabase({
                 email: normalizedEmail,
                 password: hashedPassword
-            })
+            }) } catch (error) {
+                if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+                    return { error: "Unable to create account. Try signing in." };
+                }
+                throw error;
+            }
 
             await signIn("credentials", {
                 email: normalizedEmail,
@@ -73,7 +84,7 @@ export async function authAction(
                 redirect: false
             })
 
-            redirect("/dashboard")
+            redirect(safeRedirect(formData.get("redirectTo")))
         }
 
         case "sign-out": {

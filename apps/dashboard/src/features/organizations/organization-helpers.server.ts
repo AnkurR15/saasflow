@@ -40,22 +40,22 @@ export async function requireOrganizationMembership(slug: string) {
         return notFound()
     }
 
-    const [members, currentMembership, activeInvite] = await Promise.all([
-        retrieveMembershipsByOrganizationIdFromDatabase(organization.id),
-        retrieveMembershipFromDatabase({
+    const currentMembership = await retrieveMembershipFromDatabase({
             userId,
             organizationId: organization.id,
-        }),
-        retrieveActiveInviteByOrganizationIdFromDatabase(organization.id)
-    ])
+    });
 
     if (!currentMembership) {
         return notFound()
     }
+    const [members, activeInvite] = await Promise.all([
+        retrieveMembershipsByOrganizationIdFromDatabase(organization.id),
+        currentMembership.role === "ADMIN" ? retrieveActiveInviteByOrganizationIdFromDatabase(organization.id) : null,
+    ]);
 
     return { organization, members, currentMembership, userId, activeInvite }
 }
 
 export function buildInviteUrl(token: string) { 
-    return `${process.env.NEXT_PUBLIC_APP_URL}/invite/${token}`;
+    return `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3001"}/invite/${encodeURIComponent(token)}`;
 }

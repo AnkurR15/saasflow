@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState } from "react";
+import { startTransition, useActionState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { organizationsAction } from "../organization-action.server";
@@ -37,9 +37,12 @@ export function CreateOrganizationForm() {
   return (
     <form
       action={formAction}
-      onSubmitCapture={async (e) => {
-        const ok = await form.trigger(undefined, { shouldFocus: true });
-        if (!ok) e.preventDefault();
+      onSubmit={async (event) => {
+        event.preventDefault();
+        const data = new FormData(event.currentTarget, (event.nativeEvent as SubmitEvent).submitter);
+        if (await form.trigger(undefined, { shouldFocus: true })) {
+          startTransition(() => formAction(data));
+        }
       }}
     >
       <Form {...form}>

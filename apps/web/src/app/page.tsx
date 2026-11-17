@@ -6,11 +6,16 @@ import {
   CardTitle,
   CardDescription,
 } from "@repo/ui/components/card";
-import { Building2, FolderKanban, ShieldCheck } from "lucide-react";
+import { Building2, FolderKanban, ShieldCheck, FileLock2 } from "lucide-react";
 
-const dashboardUrl = process.env.NEXT_PUBLIC_DASHBOARD_URL;
+const dashboardUrl = process.env.NEXT_PUBLIC_DASHBOARD_URL || "http://localhost:3001";
 
 const features = [
+  {
+    icon: FileLock2,
+    title: "Secure Drop",
+    description: "Share files up to 5 MiB using expiring, one-time links. Revoke access before download. Files are encrypted on the server.",
+  },
   {
     icon: Building2,
     title: "Organizations",
@@ -40,13 +45,13 @@ export default function HomePage() {
         <div className="flex items-center gap-4">
           <Link
             href={`${dashboardUrl}/auth/sign-in`}
-            target="_blank"
+
             className="text-sm text-muted-foreground hover:text-foreground transition-colors"
           >
             Sign in
           </Link>
           <Button asChild size="sm">
-            <Link href={`${dashboardUrl}/auth/sign-up`} target="_blank">
+            <Link href={`${dashboardUrl}/auth/sign-up`} >
               Get started
             </Link>
           </Button>
@@ -56,7 +61,7 @@ export default function HomePage() {
       {/* Hero */}
       <section className="flex flex-col items-center justify-center text-center px-6 py-32 flex-1">
         <h1 className="text-5xl font-bold tracking-tight max-w-2xl">
-          Manage your team and projects in one place
+          Your team, projects and secure file handoffs in one place
         </h1>
         <p className="mt-6 text-xl text-muted-foreground max-w-xl">
           Create organizations, invite members, assign roles and ship projects
@@ -64,12 +69,12 @@ export default function HomePage() {
         </p>
         <div className="mt-10 flex items-center gap-4">
           <Button asChild size="lg">
-            <Link href={`${dashboardUrl}/auth/sign-up`} target="_blank">
+            <Link href={`${dashboardUrl}/auth/sign-up`} >
               Get started free
             </Link>
           </Button>
           <Button asChild variant="outline" size="lg">
-            <Link href={`${dashboardUrl}/auth/sign-in`} target="_blank">
+            <Link href={`${dashboardUrl}/auth/sign-in`} >
               Sign in
             </Link>
           </Button>
@@ -82,7 +87,7 @@ export default function HomePage() {
           <h2 className="text-3xl font-bold text-center mb-12">
             Everything your team needs
           </h2>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {features.map((feature) => (
               <Card key={feature.title}>
                 <CardHeader>
@@ -103,7 +108,7 @@ export default function HomePage() {
           Create your account in seconds. No credit card required.
         </p>
         <Button asChild size="lg">
-          <Link href={`${dashboardUrl}/auth/sign-up`} target="_blank">
+          <Link href={`${dashboardUrl}/auth/sign-up`} >
             Create your account
           </Link>
         </Button>

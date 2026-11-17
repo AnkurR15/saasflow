@@ -1,5 +1,6 @@
 import { retrieveOrganizationWithMembersAndProjectsFromDatabase } from "@/features/organizations/organization.model";
 import { notFound } from "next/navigation";
+import Link from "next/link";
 
 type Props = {
   params: Promise<{ id: string }>;
@@ -14,6 +15,7 @@ export default async function AdminOrganizationPage({ params }: Props) {
 
   return (
     <div className="max-w-4xl mx-auto py-12 px-4 space-y-10">
+      <Link className="underline" href="/">Back to organizations</Link>
       <div>
         <h1 className="text-2xl font-semibold">{org.name}</h1>
         <p className="text-muted-foreground text-sm">/{org.slug}</p>
@@ -24,6 +26,7 @@ export default async function AdminOrganizationPage({ params }: Props) {
         <h2 className="text-lg font-semibold mb-4">
           Members ({org.memberships.length})
         </h2>
+        {!org.memberships.length && <p>No members in this organization.</p>}
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b text-left">
@@ -49,6 +52,7 @@ export default async function AdminOrganizationPage({ params }: Props) {
         <h2 className="text-lg font-semibold mb-4">
           Projects ({org.projects.length})
         </h2>
+        {!org.projects.length && <p>No projects in this organization.</p>}
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b text-left">

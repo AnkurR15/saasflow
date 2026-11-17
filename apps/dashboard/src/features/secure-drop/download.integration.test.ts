@@ -20,6 +20,7 @@ test("downloads enforce expiry, revocation and atomic one-time consumption", {
     const drop = await prisma.fileDrop.create({ data: {
       organizationId: organization.id, createdById: "test-creator", fileName: "sample.txt",
       size: bytes.length, tokenHash, ciphertext: encryptFile(bytes, tokenHash),
+      createdAt: new Date(Date.now() - 120_000),
       expiresAt: new Date(Date.now() + 60_000), ...overrides,
     } });
     return { token, id: drop.id };

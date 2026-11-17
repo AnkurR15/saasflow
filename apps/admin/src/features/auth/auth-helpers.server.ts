@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { auth } from "@/auth";
+import { isPlatformAdmin } from "./admin-policy";
 
 export async function requireAdminIsAuthenticated() {
     const session = await auth();
@@ -8,9 +9,7 @@ export async function requireAdminIsAuthenticated() {
         redirect("/auth/sign-in");
     }
 
-    const adminEmail = process.env.ADMIN_EMAIL;
-
-    if (session.user?.email !== adminEmail) {
+    if (!isPlatformAdmin(session.user)) {
         redirect("/unauthorized");
     }
 

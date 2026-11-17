@@ -1,23 +1,20 @@
-import { signIn } from "@/auth";
+import { adminSignIn } from "@/features/auth/sign-in-action";
 
-export default function AdminSignInPage() {
+export default async function AdminSignInPage({ searchParams }: { searchParams: Promise<{ error?: string }> }) {
+  const { error } = await searchParams;
   return (
     <div className="min-h-screen flex items-center justify-center">
       <div className="w-full max-w-md p-8 space-y-6">
         <h1 className="text-2xl font-semibold text-center">Admin sign in</h1>
+        {error && <p role="alert">Sign in failed. Check your email and password and try again.</p>}
         <form
-          action={async (formData) => {
-            "use server";
-            await signIn("credentials", {
-              email: formData.get("email"),
-              password: formData.get("password"),
-              redirectTo: "/",
-            });
-          }}
+          action={adminSignIn}
           className="space-y-4"
         >
           <input
             name="email"
+            aria-label="Email"
+            autoComplete="email"
             type="email"
             placeholder="Email"
             className="w-full border rounded px-3 py-2"
@@ -25,6 +22,8 @@ export default function AdminSignInPage() {
           />
           <input
             name="password"
+            aria-label="Password"
+            autoComplete="current-password"
             type="password"
             placeholder="Password"
             className="w-full border rounded px-3 py-2"

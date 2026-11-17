@@ -3,7 +3,7 @@ import { z } from "zod"
 export const organizationsServerSchema = z.discriminatedUnion("intent", [
     z.object({
         intent: z.literal("create-organization"),
-        name: z.string().min(2).max(50),
+        name: z.string().trim().min(2).max(50),
     }),
     z.object({
         intent: z.literal("update-member-role"),

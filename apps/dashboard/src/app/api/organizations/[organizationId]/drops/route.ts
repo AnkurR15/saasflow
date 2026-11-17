@@ -1,7 +1,7 @@
 import { auth } from "@/auth";
 import { prisma } from "@repo/db";
 import { encryptFile, hashToken, MAX_FILE_BYTES, newToken } from "@/features/secure-drop/crypto";
-import { DropError, failure, privateHeaders, readLimited, sameOrigin } from "@/features/secure-drop/http";
+import { DropError, failure, parseFileName, privateHeaders, readLimited, sameOrigin } from "@/features/secure-drop/http";
 
 export const runtime = "nodejs";
 type Context = { params: Promise<{ organizationId: string }> };
@@ -21,10 +21,7 @@ async function authorize(request: Request, context: Context) {
 export async function POST(request: Request, context: Context) {
   try {
     const membership = await authorize(request, context);
-    let fileName: string;
-    try { fileName = decodeURIComponent(request.headers.get("x-file-name") ?? ""); }
-    catch { throw new DropError(400, "Invalid filename."); }
-    if (!fileName || fileName.length > 180 || /[\x00-\x1f\x7f/\\]/.test(fileName)) throw new DropError(400, "Use a filename of 1–180 characters without path separators or control characters.");
+    const fileName = parseFileName(request.headers.get("x-file-name"));
     const hours = Number(request.headers.get("x-expires-hours"));
     if (![1, 24, 168].includes(hours)) throw new DropError(400, "Choose a valid expiry.");
     const bytes = await readLimited(request, MAX_FILE_BYTES);

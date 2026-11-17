@@ -60,15 +60,29 @@ export async function retrieveMembershipsByOrganizationIdFromDatabase(
     });
 }
 
-export async function updateMembershipRoleInDatabase(id: string, role: Role) {
-    return prisma.organizationMembership.update({
-        where: { id },
-        data: { role },
+export async function manageMembership({ organizationId, userId, membershipId, role }: {
+    organizationId: string; userId: string; membershipId: string; role?: Role;
+}) {
+    return prisma.$transaction(async tx => {
+        // Serialize role changes so concurrent removals cannot eliminate every admin.
+        await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${organizationId}))`;
+        const actor = await tx.organizationMembership.findUnique({
+            where: { userId_organizationId: { userId, organizationId } },
+        });
+        if (actor?.role !== "ADMIN") return { error: "Only organization admins can manage members." };
+        const target = await tx.organizationMembership.findFirst({ where: { id: membershipId, organizationId } });
+        if (!target) return { error: "Member not found in this organization." };
+        if (target.role === "ADMIN" && role !== "ADMIN") {
+            const admins = await tx.organizationMembership.count({ where: { organizationId, role: "ADMIN" } });
+            if (admins <= 1) return { error: "Assign another admin before removing or demoting the last admin." };
+        }
+        if (role) {
+            await tx.organizationMembership.update({ where: { id: membershipId, organizationId }, data: { role } });
+        } else {
+            await tx.organizationMembership.delete({ where: { id: membershipId, organizationId } });
+        }
+        return {};
     });
-}
-
-export async function deleteMembershipFromDatabase(id: string) {
-    return prisma.organizationMembership.delete({ where: { id } });
 }
 
 export async function retrieveActiveInviteByOrganizationIdFromDatabase(

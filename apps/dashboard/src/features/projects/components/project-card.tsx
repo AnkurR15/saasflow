@@ -1,4 +1,5 @@
 import { DeleteProjectButton } from "@/features/projects/components/delete-project-button";
+import Link from "next/link";
 
 type Project = {
   id: string;
@@ -12,9 +13,10 @@ type Props = {
   project: Project;
   userRole: "ADMIN" | "MODERATOR" | "MEMBER";
   currentUserId: string;
+  organizationSlug: string;
 };
 
-export function ProjectCard({ project, userRole, currentUserId }: Props) {
+export function ProjectCard({ project, userRole, currentUserId, organizationSlug }: Props) {
   const canDelete =
     userRole === "ADMIN" ||
     userRole === "MODERATOR" ||
@@ -30,7 +32,10 @@ export function ProjectCard({ project, userRole, currentUserId }: Props) {
           </p>
         )}
       </div>
-      <DeleteProjectButton projectId={project.id} canDelete={canDelete} />
+      <div className="flex items-center gap-3">
+        <Link className="text-sm underline" href={`/dashboard/organizations/${organizationSlug}/projects/${project.id}/edit`}>Edit</Link>
+        <DeleteProjectButton projectId={project.id} canDelete={canDelete} />
+      </div>
     </div>
   );
 }

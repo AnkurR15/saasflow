@@ -19,7 +19,7 @@ export default async function InvitePage({ params }: Props) {
       <div className="max-w-md mx-auto py-12 px-4 text-center">
         <h1 className="text-2xl font-semibold">Invalid invite link</h1>
         <p className="text-muted-foreground mt-2">
-          This invite link is invalid or has already been used.
+          This invite link is invalid or has been replaced. Ask an admin for a new link.
         </p>
       </div>
     );
