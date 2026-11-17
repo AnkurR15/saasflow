@@ -118,6 +118,17 @@ test("built apps serve pages and enforce Secure Drop and admin authorization ove
     assert.equal(maximum.status, 201);
     const maximumId = (await maximum.json()).id;
     assert.equal((await fetch(`${shares}/${maximumId}`, { method: "DELETE", headers: { origin, cookie: member } })).status, 204);
+    const retained = await prisma.secureShare.create({ data: {
+      organizationId: org.id, createdById: userIds[0], expiryHours: 24, expiresAt: new Date(Date.now() + 60_000), revokedAt: new Date(),
+      files: { create: Array.from({ length: 9 }, (_, index) => ({ path: `retained-${index}.zip`, size: BigInt(5 * 1024 ** 3) })) },
+    } });
+    assert.equal((await create({ files: [{ path: "extra.txt", size: 1 }], hours: 1, downloadOnce: true })).status, 409,
+      "revoking shares must not release their storage reservations before cleanup");
+    // The cleanup suite verifies that this marker is only set after removal.
+    await prisma.secureShare.update({ where: { id: retained.id }, data: { storageReleasedAt: new Date() } });
+    const afterCleanup = await create({ files: [{ path: "extra.txt", size: 1 }], hours: 1, downloadOnce: true });
+    assert.equal(afterCleanup.status, 201);
+    assert.equal((await fetch(`${shares}/${(await afterCleanup.json()).id}`, { method: "DELETE", headers: { origin, cookie: member } })).status, 204);
     const expiring = await prisma.secureShare.create({ data: {
       organizationId: org.id, createdById: userIds[0], expiryHours: 24, expiresAt: new Date(Date.now() + 60_000),
       files: { create: { path: "pending.txt", size: 1, uploadedSize: 1 } },

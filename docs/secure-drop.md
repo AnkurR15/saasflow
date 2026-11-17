@@ -23,8 +23,10 @@ file before publishing the link. Interrupted chunk requests are retried, but
 an interrupted browser session cannot currently be resumed. Expiry starts when
 the link is created. Draft uploads expire after 24 hours. There can be up to
 20 unexpired, non-revoked shares or drafts and 50 GiB of reserved file data per
-organization. A completed one-time share still counts until it expires or is
-revoked. The latest 100 new and 100 legacy shares are shown.
+organization. File reservations, including those for revoked and expired shares,
+remain charged until cleanup removes the stored payloads. A completed one-time
+share counts toward the active-share limit until it expires or is revoked. The
+latest 100 new and 100 legacy shares are shown.
 
 ## Setup
 
@@ -51,15 +53,18 @@ revoked. The latest 100 new and 100 legacy shares are shown.
    same database and `SECURE_DROP_STORAGE_DIR`. Expired or revoked share
    payloads are removed after a 24-hour grace period for in-flight downloads;
    old records are removed after 30 days. Orphaned directories from deleted
-   organizations are also cleaned up. The grace period means physical disk
-   usage can exceed the active-share quota. Monitor disk capacity and cleanup
-   failures. Backups may retain data longer.
+   organizations are also cleaned up. Reservations remain in place during the
+   grace period and if cleanup fails. Monitor disk capacity and cleanup failures.
+   Backups may retain data longer.
 
 Deploy the immutable-chunk migration and dashboard code together: stop old
 dashboard instances before enabling the new code, since older instances cannot
 read the new chunk paths. Previously uploaded chunks remain readable. Failed
 upload attempts may leave unreferenced encrypted chunks until their share is
-cleaned up.
+cleaned up. The reservation is based on declared file sizes, not actual disk
+usage; failed attempts, encryption overhead, legacy drops, and orphaned
+directories can consume additional space. Use volume quotas and service-wide
+rate and concurrency limits to bound physical disk usage.
 
 Existing legacy single-file links continue to work. Their database ciphertext
 is cleared on expiry, revocation or one-time download, as before.

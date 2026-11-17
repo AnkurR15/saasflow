@@ -119,11 +119,13 @@ model SecureShare {
   publishedAt    DateTime?
   expiresAt      DateTime
   revokedAt      DateTime?
+  storageReleasedAt DateTime?
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   project        Project? @relation(fields: [projectId], references: [id], onDelete: SetNull)
   files          SecureShareFile[]
 
   @@index([organizationId, createdAt])
+  @@index([organizationId, storageReleasedAt])
   @@index([expiresAt])
 }
 
