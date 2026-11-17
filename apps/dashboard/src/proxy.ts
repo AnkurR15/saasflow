@@ -5,7 +5,7 @@ export async function proxy(req: NextRequest) {
     const session = await auth();
     const { pathname } = req.nextUrl;
 
-    const isPublicRoute = pathname === "/" || pathname.startsWith("/auth");
+    const isPublicRoute = pathname === "/" || pathname === "/drop" || pathname.startsWith("/auth");
 
     if (!session && !isPublicRoute) {
         const signInUrl = new URL("/auth/sign-in", req.url);

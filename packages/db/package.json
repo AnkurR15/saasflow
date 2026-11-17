@@ -12,6 +12,9 @@
   },
   "scripts": {
     "db:generate": "prisma generate",
+    "db:drop-cleanup": "tsx src/secure-drop-cleanup.ts",
+    "test:secure-drop": "tsx --test ../../apps/dashboard/src/features/secure-drop/secure-drop.test.ts",
+    "test:secure-drop:integration": "tsx --tsconfig ../../apps/dashboard/tsconfig.json --test ../../apps/dashboard/src/features/secure-drop/download.integration.test.ts",
     "db:migrate": "prisma migrate dev",
     "db:studio": "prisma studio",
     "db:push": "prisma db push",

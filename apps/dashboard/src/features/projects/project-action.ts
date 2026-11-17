@@ -34,9 +34,9 @@ export async function projectsAction(
         case "create-project": {
             const { name, description, organizationId } = parsed.data;
 
+            await requireUserIsOrgMember(organizationId, userId);
             const [org] = await Promise.all([
                 retrieveOrganizationFromDatabase(organizationId),
-                requireUserIsOrgMember(organizationId, userId),
                 saveProjectToDatabase({
                     name,
                     description,
@@ -54,9 +54,9 @@ export async function projectsAction(
             const project = await retrieveProjectFromDatabase(id);
             if (!project) return { error: "Project not found" };
 
+            await requireUserIsOrgMember(project.organizationId, userId);
             const [org] = await Promise.all([
                 retrieveOrganizationFromDatabase(project.organizationId),
-                requireUserIsOrgMember(userId, project.organizationId),
                 updateProjectInDatabase(id, { name, description }),
             ]);
             redirect(`/dashboard/organizations/${org?.slug}/projects`);
