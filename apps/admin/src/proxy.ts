@@ -1,5 +1,6 @@
 import { auth } from "@/auth";
 import { NextRequest, NextResponse } from "next/server";
+import { isPlatformAdmin } from "@/features/auth/admin-policy";
 
 export async function proxy(req: NextRequest) {
     const session = await auth();
@@ -12,8 +13,7 @@ export async function proxy(req: NextRequest) {
     }
 
     if (session && !isPublicRoute) {
-        const adminEmail = process.env.ADMIN_EMAIL;
-        if (session.user?.email !== adminEmail) {
+        if (!isPlatformAdmin(session.user)) {
             return NextResponse.redirect(new URL("/unauthorized", req.url));
         }
     }

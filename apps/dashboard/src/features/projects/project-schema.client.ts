@@ -2,7 +2,7 @@ import { z } from "zod";
 
 export const createProjectSchema = z.object({
     name: z
-        .string()
+        .string().trim()
         .nonempty("Project name is required")
         .min(2, "Name must be at least 2 characters")
         .max(50, "Name must be less than 50 characters"),
@@ -11,7 +11,7 @@ export const createProjectSchema = z.object({
 
 export const updateProjectSchema = z.object({
     name: z
-        .string()
+        .string().trim()
         .nonempty("Project name is required")
         .min(2, "Name must be at least 2 characters")
         .max(50, "Name must be less than 50 characters"),

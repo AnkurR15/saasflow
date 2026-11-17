@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState } from "react";
+import { startTransition, useActionState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { projectsAction } from "../project-action";
@@ -23,9 +23,10 @@ import type { ActionResult } from "@repo/types";
 
 type Props = {
   organizationId: string;
+  project?: { id: string; name: string; description: string | null };
 };
 
-export function CreateProjectForm({ organizationId }: Props) {
+export function CreateProjectForm({ organizationId, project }: Props) {
   const [state, formAction, isPending] = useActionState<ActionResult, FormData>(
     projectsAction,
     {},
@@ -35,20 +36,24 @@ export function CreateProjectForm({ organizationId }: Props) {
     resolver: zodResolver(createProjectSchema),
     mode: "onChange",
     defaultValues: {
-      name: "",
-      description: "",
+      name: project?.name ?? "",
+      description: project?.description ?? "",
     },
   });
 
   return (
     <form
       action={formAction}
-      onSubmitCapture={async (e) => {
-        const ok = await form.trigger(undefined, { shouldFocus: true });
-        if (!ok) e.preventDefault();
+      onSubmit={async (event) => {
+        event.preventDefault();
+        const data = new FormData(event.currentTarget, (event.nativeEvent as SubmitEvent).submitter);
+        if (await form.trigger(undefined, { shouldFocus: true })) {
+          startTransition(() => formAction(data));
+        }
       }}
     >
       <input type="hidden" name="organizationId" value={organizationId} />
+      {project && <input type="hidden" name="id" value={project.id} />}
       <Form {...form}>
         <FormField
           control={form.control}
@@ -92,11 +97,11 @@ export function CreateProjectForm({ organizationId }: Props) {
         <Button
           type="submit"
           name="intent"
-          value="create-project"
+          value={project ? "update-project" : "create-project"}
           disabled={isPending}
           className="w-full mt-4"
         >
-          {isPending ? "Creating..." : "Create project"}
+          {isPending ? "Saving..." : project ? "Save changes" : "Create project"}
         </Button>
       </Form>
     </form>

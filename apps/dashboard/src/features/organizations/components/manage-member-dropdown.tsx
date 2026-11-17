@@ -16,13 +16,14 @@ export function ManageMemberDropdown({
   organizationId,
   currentRole,
 }: Props) {
-  const [, formAction, isPending] = useActionState<ActionResult, FormData>(
+  const [state, formAction, isPending] = useActionState<ActionResult, FormData>(
     organizationsAction,
     {},
   );
 
   return (
     <div className="flex gap-2">
+      {state.error && <p role="alert">{state.error}</p>}
       {currentRole !== "ADMIN" && (
         <form action={formAction}>
           <input type="hidden" name="membershipId" value={membershipId} />

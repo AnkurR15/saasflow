@@ -4,7 +4,10 @@
     "private": true,
     "scripts": {
         "dev": "turbo dev",
-        "build": "turbo build"
+        "build": "turbo build",
+        "lint": "pnpm -r --if-present lint",
+        "test": "pnpm --filter @repo/db test:secure-drop",
+        "test:integration": "pnpm --filter @repo/db test:secure-drop:integration"
     },
     "devDependencies": {
         "turbo": "^2.10.12"

@@ -30,6 +30,7 @@ export function DropRecipient() {
   return <main className="mx-auto max-w-lg space-y-6 px-6 py-20">
     <h1 className="text-3xl font-semibold">You received a secure drop</h1>
     <p className="text-muted-foreground">The file can be downloaded once before the link expires. Download only when you are ready to save it. A failed transfer may require a new link from the sender.</p>
+    <p className="text-sm text-muted-foreground">Only open files from senders you trust. Files are not scanned for malware.</p>
     <button onClick={download} disabled={busy || done} className="rounded-md bg-primary px-5 py-3 text-primary-foreground disabled:opacity-50">{done ? "Link consumed" : busy ? "Downloading…" : "Download file"}</button>
     <p role="status" aria-live="polite">{message}</p>
   </main>;

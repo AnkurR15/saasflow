@@ -9,10 +9,31 @@ export const privateHeaders = {
 };
 
 export function sameOrigin(request: Request) {
-  const origin = process.env.SECURE_DROP_APP_ORIGIN || new URL(request.url).origin;
+  const configured = process.env.SECURE_DROP_APP_ORIGIN;
+  if (process.env.NODE_ENV === "production" && !configured) {
+    throw new DropError(503, "Secure Drop origin is not configured.");
+  }
+  const origin = configured || new URL(request.url).origin;
+  const parsed = new URL(origin);
+  if (parsed.origin !== origin || !["http:", "https:"].includes(parsed.protocol)
+    || (process.env.NODE_ENV === "production" && parsed.protocol !== "https:")) {
+    throw new DropError(503, "Secure Drop origin must be an exact HTTPS origin in production.");
+  }
   if (request.headers.get("origin") !== origin) {
     throw new DropError(403, "Request origin is not allowed.");
   }
+}
+
+export function parseFileName(encoded: string | null) {
+  let name: string;
+  try { name = decodeURIComponent(encoded ?? "").normalize("NFC"); }
+  catch { throw new DropError(400, "Invalid filename."); }
+  // Reject path/control characters and bidirectional overrides that disguise extensions.
+  if (!name.trim() || name === "." || name === ".." || name.length > 180
+    || /[\x00-\x1f\x7f/\\\u202a-\u202e\u2066-\u2069]/.test(name)) {
+    throw new DropError(400, "Use a filename of 1–180 characters without path separators, control characters, or direction overrides.");
+  }
+  return name;
 }
 
 // Enforce the limit while reading, including requests with no Content-Length.

@@ -5,12 +5,10 @@ import slugify from "slugify";
 import { organizationsServerSchema } from "./organization-schema.server";
 import {
     saveOrganizationToDatabase,
-    saveMembershipToDatabase,
-    updateMembershipRoleInDatabase,
-    deleteMembershipFromDatabase,
+    manageMembership,
 } from "./organization.model";
 import { requireUserIsAuthenticated } from "@/features/auth/auth-helpers.server";
-import { requireUserIsOrgAdmin } from "./organization-helpers.server";
+import { randomUUID } from "node:crypto";
 import type { ActionResult } from "@repo/types";
 import { revalidatePath } from "next/cache";
 
@@ -32,17 +30,12 @@ export async function organizationsAction(
         case "create-organization": {
             const { name } = parsed.data;
 
-            const slug = slugify(name, { lower: true, strict: true }).slice(0, 60);
+            const slug = `${slugify(name, { lower: true, strict: true }).slice(0, 60) || "organization"}-${randomUUID()}`;
 
             const org = await saveOrganizationToDatabase({
                 name,
-                slug
-            });
-
-            await saveMembershipToDatabase({
-                user: { connect: { id: userId } },
-                organization: { connect: { id: org.id } },
-                role: "ADMIN",
+                slug,
+                memberships: { create: { userId, role: "ADMIN" } },
             });
 
             redirect(`/dashboard/organizations/${org.slug}`)
@@ -51,10 +44,10 @@ export async function organizationsAction(
         case "update-member-role": {
             const { membershipId, organizationId, role } = parsed.data;
 
-            await requireUserIsOrgAdmin(organizationId, userId)
-            await updateMembershipRoleInDatabase(membershipId, role)
+            const result = await manageMembership({ organizationId, userId, membershipId, role });
+            if (result.error) return result;
 
-            revalidatePath(`/dashboard/organizations/${organizationId}`)
+            revalidatePath("/dashboard", "layout")
 
             return {}
         }
@@ -62,10 +55,10 @@ export async function organizationsAction(
         case "remove-member": {
             const { membershipId, organizationId } = parsed.data;
 
-            await requireUserIsOrgAdmin(organizationId, userId)
-            await deleteMembershipFromDatabase(membershipId)
+            const result = await manageMembership({ organizationId, userId, membershipId });
+            if (result.error) return result;
 
-            revalidatePath(`/dashboard/organizations/${organizationId}`)
+            revalidatePath("/dashboard", "layout")
 
             return {}
         }

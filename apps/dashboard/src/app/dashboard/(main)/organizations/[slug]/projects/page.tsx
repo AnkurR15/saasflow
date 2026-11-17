@@ -41,6 +41,7 @@ export default async function ProjectsPage({ params }: Props) {
               project={project}
               userRole={currentMembership.role}
               currentUserId={currentMembership.userId}
+              organizationSlug={slug}
             />
           ))}
         </div>

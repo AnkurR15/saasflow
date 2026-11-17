@@ -11,6 +11,7 @@ export function DropManager({ organizationId, drops }: { organizationId: string;
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
   const [link, setLink] = useState("");
+  const [linkId, setLinkId] = useState("");
   const endpoint = `/api/organizations/${organizationId}/drops`;
 
   async function upload(event: React.FormEvent<HTMLFormElement>) {
@@ -19,7 +20,7 @@ export function DropManager({ organizationId, drops }: { organizationId: string;
     const data = new FormData(form);
     const file = data.get("file") as File;
     if (!file?.size || file.size > 5 * 1024 * 1024) { setMessage("Select a non-empty file up to 5 MiB."); return; }
-    setBusy(true); setMessage(""); setLink("");
+    setBusy(true); setMessage("");
     try {
       const response = await fetch(endpoint, { method: "POST", headers: {
         "Content-Type": "application/octet-stream", "x-file-name": encodeURIComponent(file.name),
@@ -28,6 +29,7 @@ export function DropManager({ organizationId, drops }: { organizationId: string;
       const result = await response.json();
       if (!response.ok) throw new Error(result.error);
       setLink(`${window.location.origin}/drop#${result.token}`);
+      setLinkId(result.id);
       form.reset(); router.refresh();
     } catch (error) { setMessage(error instanceof Error ? error.message : "Upload failed."); }
     finally { setBusy(false); }
@@ -38,6 +40,7 @@ export function DropManager({ organizationId, drops }: { organizationId: string;
     try {
       const response = await fetch(`${endpoint}?id=${encodeURIComponent(id)}`, { method: "DELETE" });
       if (!response.ok) throw new Error((await response.json()).error);
+      if (id === linkId) { setLink(""); setLinkId(""); }
       setMessage("Drop revoked."); router.refresh();
     } catch (error) { setMessage(error instanceof Error ? error.message : "Could not revoke drop."); }
     finally { setBusy(false); }
@@ -47,6 +50,7 @@ export function DropManager({ organizationId, drops }: { organizationId: string;
     <form onSubmit={upload} className="space-y-4 rounded-xl border p-6">
       <h2 className="text-lg font-semibold">Share a file securely</h2>
       <p className="text-sm text-muted-foreground">Up to 5 MiB per file and 20 active drops per organization. Anyone with the link can download once. Only share it with your intended recipient.</p>
+      <p className="text-sm text-muted-foreground">Files are encrypted on the server, not end-to-end encrypted. Copy your current link before creating another drop.</p>
       <label className="block space-y-2"><span>File</span><input className="block w-full rounded border p-2" type="file" name="file" required disabled={busy} /></label>
       <label className="block space-y-2"><span>Link expires in</span><select className="block rounded border bg-background p-2" name="hours" defaultValue="24" disabled={busy}>
         <option value="1">1 hour</option><option value="24">24 hours</option><option value="168">7 days</option>

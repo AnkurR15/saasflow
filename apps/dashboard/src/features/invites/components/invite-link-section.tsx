@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 import { invitesAction } from "../invites-action";
 import { Button } from "@repo/ui/components/button";
 import type { ActionResult } from "@repo/types";
@@ -11,6 +11,7 @@ type Props = {
 };
 
 export function InviteLinkSection({ organizationId, inviteUrl }: Props) {
+  const [message, setMessage] = useState("");
   const [state, formAction, isPending] = useActionState<
     ActionResult<{ url?: string }>,
     FormData
@@ -18,13 +19,17 @@ export function InviteLinkSection({ organizationId, inviteUrl }: Props) {
 
   const currentUrl = state?.data?.url ?? inviteUrl;
 
-  const handleCopy = () => {
-    if (currentUrl) navigator.clipboard.writeText(currentUrl);
+  const handleCopy = async () => {
+    if (!currentUrl) return;
+    try { await navigator.clipboard.writeText(currentUrl); setMessage("Invite link copied."); }
+    catch { setMessage("Could not copy automatically. Select and copy the link above."); }
   };
 
   return (
     <div className="border rounded-lg p-4 space-y-3">
       <h2 className="font-medium">Invite link</h2>
+      {state.error && <p role="alert">{state.error}</p>}
+      <p role="status">{message}</p>
 
       {currentUrl ? (
         <div className="space-y-2">

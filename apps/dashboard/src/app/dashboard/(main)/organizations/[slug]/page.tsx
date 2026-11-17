@@ -1,4 +1,5 @@
 import { requireOrganizationMembership } from "@/features/organizations/organization-helpers.server";
+import Link from "next/link";
 
 type Props = {
   params: Promise<{ slug: string }>;
@@ -15,6 +16,11 @@ export default async function OrganizationPage({ params }: Props) {
       <p className="text-xs text-muted-foreground mt-1">
         Your role: {currentMembership.role}
       </p>
+      <nav aria-label="Organization features" className="mt-8 grid gap-4 sm:grid-cols-3">
+        <Link className="rounded-lg border p-5 hover:bg-muted" href={`/dashboard/organizations/${slug}/projects`}>Manage projects</Link>
+        <Link className="rounded-lg border p-5 hover:bg-muted" href={`/dashboard/organizations/${slug}/members`}>Team members</Link>
+        <Link className="rounded-lg border p-5 hover:bg-muted" href={`/dashboard/organizations/${slug}/secure-drop`}>Share a file</Link>
+      </nav>
     </div>
   );
 }

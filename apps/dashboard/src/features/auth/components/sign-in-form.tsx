@@ -1,6 +1,6 @@
 "use client"
 
-import { useActionState } from "react";
+import { startTransition, useActionState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { authAction } from "../auth-actions";
@@ -19,7 +19,7 @@ import type { ActionResult } from "@repo/types";
 import { signInSchema, SignInValues } from "../auth-schema.client";
 
 
-export function SignInForm(){
+export function SignInForm({ redirectTo = "/dashboard" }: { redirectTo?: string }){
    const [state, formAction, isPending] = useActionState<ActionResult, FormData>(
        authAction,
        {},
@@ -33,13 +33,15 @@ export function SignInForm(){
      });
     
     return(
-       <form action={formAction} onSubmitCapture={
-        async (e) => {
-            const ok = await form.trigger(undefined, { shouldFocus: true});
-            if(!ok) e.preventDefault();
+       <form action={formAction} onSubmit={async (event) => {
+        event.preventDefault();
+        const data = new FormData(event.currentTarget, (event.nativeEvent as SubmitEvent).submitter);
+        if (await form.trigger(undefined, { shouldFocus: true })) {
+          startTransition(() => formAction(data));
         }
-       }>
+      }}>
 
+        <input type="hidden" name="redirectTo" value={redirectTo} />
         <Form {...form}>
         <FormField
           control={form.control}
