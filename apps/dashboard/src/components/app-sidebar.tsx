@@ -27,6 +27,7 @@ import {
   Settings,
   ChevronsUpDown,
   Plus,
+  ShieldCheck,
 } from "lucide-react";
 import Link from "next/link";
 import { UserMenu } from "./user-menu";
@@ -44,6 +45,7 @@ type Props = {
 };
 
 const navLinks = [
+  { label: "Secure Drop", icon: ShieldCheck, href: "secure-drop" },
   { label: "Projects", icon: FolderKanban, href: "projects" },
   { label: "Members", icon: Users, href: "members" },
   { label: "Settings", icon: Settings, href: "settings" },

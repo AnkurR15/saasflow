@@ -37,6 +37,7 @@ model Organization {
   memberships OrganizationMembership[]
   projects    Project[]
   invites     Invite[]
+  fileDrops FileDrop[]
 }
 
 model OrganizationMembership {
@@ -80,4 +81,22 @@ enum Role {
   MEMBER
   MODERATOR
   ADMIN
+}
+
+model FileDrop {
+  id             String   @id @default(cuid())
+  organizationId String
+  createdById    String
+  fileName       String
+  size           Int
+  tokenHash      String   @unique
+  ciphertext     Bytes
+  createdAt      DateTime @default(now())
+  expiresAt      DateTime
+  downloadedAt   DateTime?
+  revokedAt      DateTime?
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, createdAt])
+  @@index([expiresAt])
 }

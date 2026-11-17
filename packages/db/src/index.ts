@@ -16,9 +16,8 @@ const globalForPrisma = globalThis as unknown as {
 
 export const prisma = globalForPrisma.prisma ?? new PrismaClient({
     adapter,
-    log: env.NODE_ENV === "development"
-        ? ["query", "error", "warn"]
-        : ["error"]
+    // Query/error events can contain secure-drop payloads and identifiers.
+    log: ["warn"]
 });
 
 if (env.NODE_ENV !== "production") {
