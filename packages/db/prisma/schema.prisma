@@ -38,6 +38,7 @@ model Organization {
   projects    Project[]
   invites     Invite[]
   fileDrops FileDrop[]
+  secureShares SecureShare[]
 }
 
 model OrganizationMembership {
@@ -66,6 +67,7 @@ model Project {
 
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   createdBy    User?        @relation(fields: [createdById], references: [id])
+  secureShares SecureShare[]
   @@index([organizationId, createdAt])
   @@index([createdById])
 }
@@ -103,4 +105,38 @@ model FileDrop {
 
   @@index([organizationId, createdAt])
   @@index([expiresAt])
+}
+
+model SecureShare {
+  id             String   @id @default(cuid())
+  organizationId String
+  createdById    String
+  projectId      String?
+  tokenHash      String?  @unique
+  downloadOnce   Boolean  @default(true)
+  expiryHours    Int
+  createdAt      DateTime @default(now())
+  publishedAt    DateTime?
+  expiresAt      DateTime
+  revokedAt      DateTime?
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  project        Project? @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  files          SecureShareFile[]
+
+  @@index([organizationId, createdAt])
+  @@index([expiresAt])
+}
+
+model SecureShareFile {
+  id           String   @id @default(cuid())
+  shareId      String
+  path         String
+  size         BigInt
+  uploadedSize BigInt   @default(0)
+  downloadedAt DateTime?
+  downloadCount Int     @default(0)
+  share        SecureShare @relation(fields: [shareId], references: [id], onDelete: Cascade)
+
+  @@unique([shareId, path])
+  @@index([shareId])
 }

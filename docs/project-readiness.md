@@ -1,5 +1,11 @@
 # SaaSFlow and Secure Drop: readiness and portfolio
 
+> Update: Secure Drop now supports multiple files, folder paths, project-linked
+> shares, and encrypted chunk storage for files up to 5 GiB. The historical
+> 5 MiB descriptions and verification results below describe the earlier
+> database-backed implementation; see [Secure Drop](secure-drop.md) for current
+> limits, deployment requirements, and security boundaries.
+
 ## What is implemented
 
 This is a Next.js/React/TypeScript monorepo with PostgreSQL, Prisma, Auth.js,
