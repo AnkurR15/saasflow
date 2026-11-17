@@ -8,7 +8,7 @@ export const privateHeaders = {
   "X-Content-Type-Options": "nosniff",
 };
 
-export function sameOrigin(request: Request) {
+export function sameOrigin(request: Request, options?: { allowSameOriginForm?: boolean }) {
   const configured = process.env.SECURE_DROP_APP_ORIGIN;
   if (process.env.NODE_ENV === "production" && !configured) {
     throw new DropError(503, "Secure Drop origin is not configured.");
@@ -19,7 +19,14 @@ export function sameOrigin(request: Request) {
     || (process.env.NODE_ENV === "production" && parsed.protocol !== "https:")) {
     throw new DropError(503, "Secure Drop origin must be an exact HTTPS origin in production.");
   }
-  if (request.headers.get("origin") !== origin) {
+  const requestOrigin = request.headers.get("origin");
+  // A no-referrer page can submit a same-origin form with a null Origin.
+  // Fetch Metadata is set by the browser and cross-site forms cannot set it
+  // to same-origin. This exception is only used for bearer-token downloads.
+  const sameOriginForm = options?.allowSameOriginForm
+    && (!requestOrigin || requestOrigin === "null")
+    && request.headers.get("sec-fetch-site") === "same-origin";
+  if (requestOrigin !== origin && !sameOriginForm) {
     throw new DropError(403, "Request origin is not allowed.");
   }
 }

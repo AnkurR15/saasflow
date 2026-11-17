@@ -5,6 +5,9 @@ import { spawn, type ChildProcess } from "node:child_process";
 import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
 import { encode } from "next-auth/jwt";
+import { mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import path from "node:path";
 
 // Run explicitly after building all apps. Uses only the supplied disposable database.
 test("built apps serve pages and enforce Secure Drop and admin authorization over HTTP", {
@@ -20,6 +23,7 @@ test("built apps serve pages and enforce Secure Drop and admin authorization ove
   let organizationId: string | undefined;
   const root = fileURLToPath(new URL("../../../../../", import.meta.url));
   const origin = "https://drop.example.test";
+  const storage = await mkdtemp(path.join(tmpdir(), "secure-share-test-"));
   async function start(app: string, port: number, adminId: string) {
     const cwd = `${root}/apps/${app}`;
     const require = createRequire(`${cwd}/package.json`);
@@ -28,6 +32,7 @@ test("built apps serve pages and enforce Secure Drop and admin authorization ove
         ...process.env, NODE_ENV: "production", AUTH_SECRET: secret, AUTH_TRUST_HOST: "true",
         AUTH_URL: `http://127.0.0.1:${port}`, ADMIN_USER_ID: adminId,
         SECURE_DROP_APP_ORIGIN: origin, SECURE_DROP_ENCRYPTION_KEY: randomBytes(32).toString("hex"),
+        SECURE_DROP_STORAGE_DIR: storage,
       },
     });
     processes.push(child);
@@ -44,14 +49,16 @@ test("built apps serve pages and enforce Secure Drop and admin authorization ove
     return `authjs.session-token=${token}`;
   }
   try {
-    for (let i = 0; i < 2; i++) userIds.push((await prisma.user.create({ data: { email: `${suffix}-${i}@example.test`, password: "unused-test-hash" } })).id);
+    for (let i = 0; i < 3; i++) userIds.push((await prisma.user.create({ data: { email: `${suffix}-${i}@example.test`, password: "unused-test-hash" } })).id);
     const org = await prisma.organization.create({ data: { name: "HTTP smoke", slug: suffix, memberships: { create: { userId: userIds[0], role: "ADMIN" } } } });
     organizationId = org.id;
+    await prisma.organizationMembership.create({ data: { organizationId: org.id, userId: userIds[2], role: "MEMBER" } });
     const project = await prisma.project.create({ data: { name: "Smoke project", organizationId: org.id, createdById: userIds[0] } });
     const invite = await prisma.invite.create({ data: { organizationId: org.id, expiresAt: new Date(Date.now() + 60000) } });
     await Promise.all([start("web", 3330, userIds[0]), start("dashboard", 3331, userIds[0]), start("admin", 3332, userIds[0])]);
     const member = await cookie(userIds[0]);
     const outsider = await cookie(userIds[1]);
+    const teammate = await cookie(userIds[2]);
     const dashboard = "http://127.0.0.1:3331";
     const base = `/dashboard/organizations/${org.slug}`;
     const landing = await fetch("http://127.0.0.1:3330");
@@ -61,7 +68,7 @@ test("built apps serve pages and enforce Secure Drop and admin authorization ove
     const protectedPages: [string, RegExp][] = [
       [base, /HTTP smoke/], [`${base}/members`, /Members/], [`${base}/projects`, /Projects/],
       [`${base}/projects/new`, /Create a project/], [`${base}/projects/${project.id}/edit`, /Edit project/],
-      [`${base}/secure-drop`, /Share a file securely/], ["/dashboard/organizations/new", /Create an organization/],
+      [`${base}/secure-drop`, /Create a share/], ["/dashboard/organizations/new", /Create an organization/],
       [`/invite/${invite.token}`, /You have been invited to join/],
     ];
     for (const [path, content] of protectedPages) {
@@ -99,10 +106,77 @@ test("built apps serve pages and enforce Secure Drop and admin authorization ove
     const second = await (await fetch(endpoint, { method: "POST", headers, body: "revoke me" })).json();
     assert.equal((await fetch(`${endpoint}?id=${second.id}`, { method: "DELETE", headers })).status, 204);
     assert.equal((await fetch(`${dashboard}/api/secure-drop/download`, { method: "POST", headers: { origin }, body: second.token })).status, 404);
+
+    const shares = `${dashboard}/api/organizations/${org.id}/shares`;
+    const manifest = { files: [{ path: "reports/large.pdf", size: 4 * 1024 * 1024 + 3 }, { path: "reports/data.xlsx", size: 4 }], projectId: project.id, hours: 24, downloadOnce: true };
+    const create = (body: unknown, who = member) => fetch(shares, { method: "POST", headers: { origin, cookie: who, "content-type": "application/json" }, body: JSON.stringify(body) });
+    assert.equal((await create(manifest, outsider)).status, 404);
+    assert.equal((await create({ ...manifest, projectId: "foreign-project" })).status, 400);
+    assert.equal((await create({ ...manifest, files: [{ path: "../escape", size: 1 }] })).status, 400);
+    assert.equal((await create({ ...manifest, files: [{ path: "too-big.zip", size: 5 * 1024 ** 3 + 1 }] })).status, 400);
+    const maximum = await create({ files: [{ path: "maximum.zip", size: 5 * 1024 ** 3 }], hours: 1, downloadOnce: true });
+    assert.equal(maximum.status, 201);
+    const maximumId = (await maximum.json()).id;
+    assert.equal((await fetch(`${shares}/${maximumId}`, { method: "DELETE", headers: { origin, cookie: member } })).status, 204);
+    const created = await create(manifest);
+    assert.equal(created.status, 201);
+    const draft = await created.json();
+    const publish = () => fetch(`${shares}/${draft.id}`, { method: "POST", headers: { origin, cookie: member } });
+    assert.equal((await publish()).status, 409);
+    assert.equal((await fetch(`${shares}/${draft.id}`, { method: "DELETE", headers: { origin, cookie: teammate } })).status, 404);
+    const large = Buffer.alloc(4 * 1024 * 1024 + 3, 0x42);
+    async function chunk(fileId: string, index: number, body: Buffer) {
+      return fetch(`${shares}/${draft.id}/files/${fileId}`, { method: "PUT", headers: { origin, cookie: member, "x-chunk-index": String(index) }, body: new Uint8Array(body) });
+    }
+    const largeId = draft.files.find((file: { path: string }) => file.path.endsWith("large.pdf")).id;
+    const smallId = draft.files.find((file: { path: string }) => file.path.endsWith("data.xlsx")).id;
+    assert.equal((await chunk(largeId, 1, large.subarray(-3))).status, 409);
+    assert.equal((await chunk(largeId, 0, large.subarray(0, -3))).status, 204);
+    assert.equal((await chunk(largeId, 0, large.subarray(0, -3))).status, 204);
+    assert.equal((await chunk(largeId, 0, Buffer.alloc(4 * 1024 * 1024, 0x43))).status, 409);
+    assert.equal((await chunk(largeId, 1, large.subarray(-3))).status, 204);
+    assert.equal((await chunk(smallId, 0, Buffer.from("data"))).status, 204);
+    const published = await publish();
+    assert.equal(published.status, 200);
+    const shareToken = (await published.json()).token;
+    const details = await fetch(`${dashboard}/api/secure-drop/details`, { method: "POST", headers: { origin }, body: shareToken });
+    assert.equal(details.status, 200);
+    assert.deepEqual((await details.json()).files.map((file: { path: string }) => file.path), ["reports/data.xlsx", "reports/large.pdf"]);
+    const getFile = (fileId: string, value = shareToken) => fetch(`${dashboard}/api/secure-drop/file`, { method: "POST", headers: { origin, "content-type": "application/x-www-form-urlencoded" }, body: new URLSearchParams({ token: value, fileId }) });
+    const raced = await Promise.all([getFile(largeId), getFile(largeId)]);
+    assert.deepEqual(raced.map(response => response.status).sort(), [200, 404]);
+    assert.deepEqual(Buffer.from(await raced.find(response => response.ok)!.arrayBuffer()), large);
+    assert.equal(await (await getFile(smallId)).text(), "data");
+    assert.equal((await getFile(smallId)).status, 404);
+
+    const repeatDraft = await (await create({ files: [{ path: "again.txt", size: 5 }], hours: 1, downloadOnce: false })).json();
+    const repeatId = repeatDraft.files[0].id;
+    assert.equal((await fetch(`${shares}/${repeatDraft.id}/files/${repeatId}`, { method: "PUT", headers: { origin, cookie: member, "x-chunk-index": "0" }, body: "again" })).status, 204);
+    const repeatToken = (await (await fetch(`${shares}/${repeatDraft.id}`, { method: "POST", headers: { origin, cookie: member } })).json()).token;
+    assert.equal(await (await getFile(repeatId, repeatToken)).text(), "again");
+    assert.equal(await (await getFile(repeatId, repeatToken)).text(), "again");
+    await prisma.secureShare.update({ where: { id: repeatDraft.id }, data: { expiresAt: new Date(Date.now() - 1000) } });
+    assert.equal((await getFile(repeatId, repeatToken)).status, 404);
+    await prisma.secureShare.update({ where: { id: repeatDraft.id }, data: { expiresAt: new Date(Date.now() + 60000) } });
+    assert.equal((await fetch(`${shares}/${repeatDraft.id}`, { method: "DELETE", headers: { origin, cookie: member } })).status, 204);
+    assert.equal((await getFile(repeatId, repeatToken)).status, 404);
+
+    const teamDraft = await (await create({ files: [{ path: "team-only.txt", size: 4 }], hours: 1, downloadOnce: false }, teammate)).json();
+    assert.equal((await fetch(`${shares}/${teamDraft.id}/files/${teamDraft.files[0].id}`, { method: "PUT", headers: { origin, cookie: teammate, "x-chunk-index": "0" }, body: "team" })).status, 204);
+    const teamToken = (await (await fetch(`${shares}/${teamDraft.id}`, { method: "POST", headers: { origin, cookie: teammate } })).json()).token;
+    const adminPage = await (await fetch(dashboard + `${base}/secure-drop`, { headers: { cookie: member } })).text();
+    assert.match(adminPage, /team-only\.txt/);
+    assert.doesNotMatch(adminPage, new RegExp(teamToken));
+    const memberPage = await (await fetch(dashboard + `${base}/secure-drop`, { headers: { cookie: teammate } })).text();
+    assert.match(memberPage, /team-only\.txt/);
+    assert.doesNotMatch(memberPage, /again\.txt/);
+    assert.equal((await fetch(`${shares}/${teamDraft.id}`, { method: "DELETE", headers: { origin, cookie: member } })).status, 204);
+    assert.equal((await getFile(teamDraft.files[0].id, teamToken)).status, 404);
   } finally {
     for (const child of processes) child.kill();
     if (organizationId) await prisma.organization.delete({ where: { id: organizationId } });
     await prisma.user.deleteMany({ where: { id: { in: userIds } } });
     await prisma.$disconnect();
+    await rm(storage, { recursive: true, force: true });
   }
 });

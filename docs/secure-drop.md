@@ -1,95 +1,81 @@
-# Secure Drop
+﻿# Secure Drop
 
-Organization members can upload a file (1 byte–5 MiB), choose 1 hour, 24 hours,
-or 7 days, and copy a one-time download link. Open an organization's **Secure
-Drop** sidebar entry to start. Members can see the latest 100 drop records;
-only the creator or an organization admin can revoke a drop. Each organization
-can have up to 20 active drops.
+Organization members can share files or a selected folder with an expiring
+bearer link. Select an organization in the sidebar, open **Secure Drop**, and
+optionally associate the share with a project in that organization. Uploads
+accept ordinary business file types, including documents, spreadsheets, PDFs,
+images and archives. A share can contain 1–200 non-empty files, each up to
+5 GiB, and up to 20 GiB in total. Folder paths are preserved; browsers do not
+supply empty directories through the folder picker.
 
-Recipients need the complete link but no SaaSFlow account. Opening the page
-does not consume the link. Clicking Download claims it atomically and clears
-the stored payload. If the network fails after that claim, the sender must
-create another drop. Revocation and expiry prevent further downloads but
-cannot retract a file already delivered or an already claimed response.
+Choose a lifetime of 1 hour, 24 hours or 7 days and either multiple downloads
+or **once per file**. With the latter, each file may be claimed once, so a
+recipient can choose different files from the same share. Opening the link and
+viewing its file list does not consume a download. A claim happens before the
+transfer finishes: a failed one-time transfer needs a new share. A sender sees
+their own shares and can revoke them. Organization admins can see and revoke
+their team's shares. Revocation and expiry block new downloads, but cannot
+recall a response already started.
+
+Uploads are divided into 4 MiB chunks, with progress shown in the browser.
+The server verifies the declared path, size, order and completion of each
+file before publishing the link. Interrupted chunk requests are retried, but
+an interrupted browser session cannot currently be resumed. Expiry starts when
+the link is created. Draft uploads expire after 24 hours. There can be up to
+20 unexpired, non-revoked shares or drafts and 50 GiB of reserved file data per
+organization. A completed one-time share still counts until it expires or is
+revoked. The latest 100 new and 100 legacy shares are shown.
 
 ## Setup
 
-1. Install dependencies with `pnpm install --frozen-lockfile`.
-2. Configure `DATABASE_URL` and `DIRECT_URL` in `packages/db/.env` for your
-   PostgreSQL database. Run `pnpm --filter @repo/db db:generate`, then
+1. Install dependencies with `pnpm install --frozen-lockfile`. Configure
+   `DATABASE_URL` and `DIRECT_URL` in `packages/db/.env`, run
+   `pnpm --filter @repo/db db:generate`, then
    `pnpm --filter @repo/db exec prisma migrate deploy`.
-3. Copy `apps/dashboard/.env.example` to `.env.local` in the same directory.
-   Set the database URL, existing Auth.js settings, and a securely generated
-   32-byte hex `SECURE_DROP_ENCRYPTION_KEY`. Store the key in your deployment's
-   secret manager; do not commit it. All instances must use the same key.
-4. Set `SECURE_DROP_APP_ORIGIN` to the exact browser-facing origin (no trailing
-   slash), and align `AUTH_URL` and `NEXT_PUBLIC_APP_URL`. Use HTTPS outside
-   localhost. Your hosting/proxy must allow 5 MiB request bodies.
-5. Run `pnpm --filter dashboard dev`, sign in, select an organization, and open
-   Secure Drop. Test the link in a signed-out browser. A second download should
-   fail. Also verify expiry, revocation, and access with another organization.
-6. Schedule `pnpm --filter @repo/db db:drop-cleanup` on the server at least hourly.
-   It clears expired ciphertext and removes records 30 days after expiry.
-   Uploading also clears expired payloads for that organization. Expiry is
-   enforced on every download even before cleanup runs.
+2. Configure the dashboard's database and Auth.js settings. Set
+   `SECURE_DROP_ENCRYPTION_KEY` to a stable, securely generated 32-byte hex key
+   and `SECURE_DROP_APP_ORIGIN` to the exact public HTTPS origin, without a
+   trailing slash. HTTP is permitted only for local development.
+3. Set `SECURE_DROP_STORAGE_DIR` to an absolute path on a **private, durable
+   volume** with sufficient free space. All dashboard instances and the cleanup
+   job must have read/write access to the same volume and use the same key.
+   Do not serve this directory as static files. Back up the volume and database
+   consistently. Local ephemeral/serverless filesystems are unsuitable.
+4. Configure the proxy and hosting platform to accept at least 4 MiB request
+   bodies and long-lived streaming download responses. Test the actual hosting
+   timeouts and concurrent transfer capacity with representative large files.
+5. Run `pnpm --filter dashboard dev`, sign in, and create a share. Open the
+   link in a signed-out browser. Test the selected download policy, expiry,
+   revocation, and a separate organization's access.
+6. Schedule `pnpm --filter @repo/db db:drop-cleanup` at least hourly with the
+   same database and `SECURE_DROP_STORAGE_DIR`. Expired or revoked share
+   payloads are removed after a 24-hour grace period for in-flight downloads;
+   old records are removed after 30 days. Orphaned directories from deleted
+   organizations are also cleaned up. The grace period means physical disk
+   usage can exceed the active-share quota. Monitor disk capacity and cleanup
+   failures. Backups may retain data longer.
 
-Run `pnpm --filter @repo/db test:secure-drop` for cryptography, configuration,
-stream-size, and origin-check regression tests. Run dashboard `next typegen`
-before `tsc --noEmit` to generate the app's route types.
+Existing legacy single-file links continue to work. Their database ciphertext
+is cleared on expiry, revocation or one-time download, as before.
 
-For database regression tests, migrate a disposable PostgreSQL test database,
-set `SECURE_DROP_TEST_DATABASE_URL` to its connection string, then run
-`pnpm --filter @repo/db test:secure-drop:integration`. This tests simultaneous
-claims, repeat downloads, expiry, revocation, unknown tokens, ciphertext
-clearing, and recovery after an encryption configuration failure. It creates
-and removes its own test organization. Without that variable it explicitly skips.
+## Security and operational boundaries
 
-## Security boundaries
+Chunks are encrypted at rest with AES-256-GCM and authenticated against their
+share, file and position. Tokens are random, stored only as hashes, and placed
+in the URL fragment; the recipient submits the token in a POST body. File and
+folder names, sizes, ownership and activity are metadata visible to the server
+and authorized team members. Avoid logging request bodies and links.
 
-Files use server-side AES-256-GCM encryption with a unique nonce and the token
-hash as authenticated associated data. Random 256-bit bearer tokens are stored
-only as SHA-256 hashes. The raw token is returned once, kept in a URL fragment,
-and submitted in a POST body when downloading. Do not add analytics to the
-recipient page or log bodies at your reverse proxy. API responses disable
-caching. Filenames, sizes, organization IDs, and timestamps are metadata and
-remain visible to the server and organization members.
+The completion check is **not malware scanning**. Files are not scanned or
+quarantined, and recipient identities are not verified. The server can decrypt
+files; this is not end-to-end encryption or the separate SecureDrop project.
+Anyone with the link can use it. Apply service-wide rate and concurrency limits,
+monitor capacity, arrange malware scanning and abuse handling, and plan key
+rotation and backup retention before offering this as a public service. A
+storage failure during a one-time response may consume that file's claim.
 
-This is **not end-to-end encryption**, anonymous whistleblower software, or the
-separate SecureDrop project. The app server can decrypt files. Anyone holding
-the link can use it. There is no malware scanning or recipient identity check.
-Database backups may retain old ciphertext; manage their retention separately.
-Encryption key rotation requires a migration strategy for active files.
-Apply ingress request/concurrency limits before exposing this publicly; the
-per-file and per-organization quotas do not replace service-wide rate limits.
-
-Production now requires an explicit HTTPS `SECURE_DROP_APP_ORIGIN`; a missing
-setting, HTTP origin, trailing slash, or path fails closed. Local development
-still supports HTTP. Filenames reject path separators, control characters and
-Unicode direction overrides. The dashboard prevents framing and suppresses
-referrers; the recipient page also requests no indexing.
-
-See [project readiness and resume guidance](project-readiness.md) for the
-verification checklist, public-launch priorities, and accurate portfolio claims.
-
-## Tailscale and Go
-
-No Tailcat integration existed in the source branch. If “tailcat” means
-Tailscale, serve the dashboard privately with Tailscale Serve, set the app's
-origin settings to its HTTPS hostname, and restrict the underlying app port
-to loopback. Keep application login and organization checks enabled. Recipients
-must have access to that tailnet. Tailscale Funnel exposes the app publicly and
-should only be enabled deliberately.
-
-References: https://tailscale.com/docs/reference/tailscale-cli/serve and
-https://tailscale.com/docs/features/tailscale-funnel.
-
-Keep this small-file implementation in Next.js initially. A Go service is a
-reasonable next step for streamed, resumable large transfers or a `tsnet`
-gateway. That service would need authenticated internal calls, the same atomic
-download/revocation rules, and a clear owner for storage and cleanup. Adding Go
-solely for encryption would add operational work without improving this flow.
-
-Useful next additions: recipient email verification, audit events, encrypted
-object storage with lifecycle deletion, malware quarantine, project-linked
-drops, and client-side encryption. The current flow supports temporary client
-handoffs, support diagnostics, and internal document sharing.
+Run `pnpm test` for unit tests and `pnpm lint` for lint. For database tests,
+apply migrations to a disposable PostgreSQL database, set
+`SECURE_DROP_TEST_DATABASE_URL`, and run `pnpm test:integration`. Set
+`RUN_APP_SMOKE=1` after building all apps to additionally exercise the HTTP
+flows. Without these settings the relevant suites are skipped.

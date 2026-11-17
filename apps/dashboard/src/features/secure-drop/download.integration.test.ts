@@ -2,6 +2,10 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { randomBytes, randomUUID } from "node:crypto";
 import { encryptFile, hashToken, newToken } from "./crypto";
+import { mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import path from "node:path";
+import { writeChunk } from "./storage";
 
 // Only runs against an explicitly supplied, migrated test database.
 test("downloads enforce expiry, revocation and atomic one-time consumption", {
@@ -53,5 +57,42 @@ test("downloads enforce expiry, revocation and atomic one-time consumption", {
   } finally {
     await prisma.organization.delete({ where: { id: organization.id } });
     await prisma.$disconnect();
+  }
+});
+
+test("browser form downloads work with a null Origin while rejecting cross-site forms", {
+  skip: !process.env.SECURE_DROP_TEST_DATABASE_URL,
+}, async () => {
+  process.env.DATABASE_URL = process.env.SECURE_DROP_TEST_DATABASE_URL;
+  process.env.SECURE_DROP_ENCRYPTION_KEY = randomBytes(32).toString("hex");
+  process.env.SECURE_DROP_APP_ORIGIN = "https://drop.example.test";
+  const storage = await mkdtemp(path.join(tmpdir(), "secure-form-test-"));
+  process.env.SECURE_DROP_STORAGE_DIR = storage;
+  const { prisma } = await import("@repo/db");
+  const { POST } = await import("../../app/api/secure-drop/file/route");
+  const organization = await prisma.organization.create({ data: { name: "Form download test", slug: `form-${randomUUID()}` } });
+  const token = newToken();
+  const bytes = Buffer.from("browser form download");
+  try {
+    const share = await prisma.secureShare.create({ data: {
+      organizationId: organization.id, createdById: "test-user", tokenHash: hashToken(token), downloadOnce: true,
+      expiryHours: 1, publishedAt: new Date(), expiresAt: new Date(Date.now() + 60_000),
+      files: { create: { path: "folder/file.txt", size: bytes.length, uploadedSize: bytes.length } },
+    }, include: { files: true } });
+    const file = share.files[0];
+    await writeChunk(share.id, file.id, 0, bytes);
+    const submit = (site: string) => POST(new Request("https://drop.example.test/api/secure-drop/file", {
+      method: "POST", headers: { origin: "null", "sec-fetch-site": site, "content-type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({ token, fileId: file.id }),
+    }));
+    assert.equal((await submit("cross-site")).status, 403);
+    const response = await submit("same-origin");
+    assert.equal(response.status, 200);
+    assert.deepEqual(Buffer.from(await response.arrayBuffer()), bytes);
+    assert.equal((await submit("same-origin")).status, 404);
+  } finally {
+    await prisma.organization.delete({ where: { id: organization.id } });
+    await prisma.$disconnect();
+    await rm(storage, { recursive: true, force: true });
   }
 });
