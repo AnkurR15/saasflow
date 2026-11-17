@@ -1,4 +1,4 @@
-﻿import { mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
 import { decryptFile, encryptFile } from "./crypto";
@@ -23,9 +23,10 @@ export function storageRoot() {
   return path.resolve(root);
 }
 
-function chunkPath(shareId: string, fileId: string, index: number) {
-  if (!/^[a-z0-9]+$/.test(shareId) || !/^[a-z0-9]+$/.test(fileId) || !Number.isSafeInteger(index) || index < 0) throw new Error("Invalid storage identifier");
-  return path.join(storageRoot(), shareId, fileId, `${index}.chunk`);
+function chunkPath(shareId: string, fileId: string, index: number, storageKey?: string) {
+  if (!/^[a-z0-9]+$/.test(shareId) || !/^[a-z0-9]+$/.test(fileId) || !Number.isSafeInteger(index) || index < 0
+    || (storageKey !== undefined && !/^[a-f0-9-]{36}$/.test(storageKey))) throw new Error("Invalid storage identifier");
+  return path.join(storageRoot(), shareId, fileId, storageKey ? `${index}.${storageKey}.chunk` : `${index}.chunk`);
 }
 
 function aad(shareId: string, fileId: string, index: number) { return `${shareId}:${fileId}:${index}`; }
@@ -36,15 +37,16 @@ export async function prepareStorage() {
 }
 
 export async function writeChunk(shareId: string, fileId: string, index: number, bytes: Uint8Array) {
-  const target = chunkPath(shareId, fileId, index);
+  const storageKey = randomUUID();
+  const target = chunkPath(shareId, fileId, index, storageKey);
   await mkdir(path.dirname(target), { recursive: true, mode: 0o700 });
-  const temporary = `${target}.${randomUUID()}.tmp`;
-  try {
-    await writeFile(temporary, encryptFile(bytes, aad(shareId, fileId, index)), { mode: 0o600, flag: "wx" });
-    await rename(temporary, target);
-  } finally { await rm(temporary, { force: true }); }
+  // Each attempt has its own path. Only the transaction's committed key makes
+  // it visible, even if a timed-out transaction finishes writing later.
+  await writeFile(target, encryptFile(bytes, aad(shareId, fileId, index)), { mode: 0o600, flag: "wx" });
+  return storageKey;
 }
 
-export async function readChunk(shareId: string, fileId: string, index: number) {
-  return decryptFile(await readFile(chunkPath(shareId, fileId, index)), aad(shareId, fileId, index));
+export async function readChunk(shareId: string, fileId: string, index: number, storageKey?: string) {
+  // No key means this chunk was uploaded before immutable chunk references.
+  return decryptFile(await readFile(chunkPath(shareId, fileId, index, storageKey)), aad(shareId, fileId, index));
 }

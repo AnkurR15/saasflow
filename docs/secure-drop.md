@@ -55,6 +55,12 @@ revoked. The latest 100 new and 100 legacy shares are shown.
    usage can exceed the active-share quota. Monitor disk capacity and cleanup
    failures. Backups may retain data longer.
 
+Deploy the immutable-chunk migration and dashboard code together: stop old
+dashboard instances before enabling the new code, since older instances cannot
+read the new chunk paths. Previously uploaded chunks remain readable. Failed
+upload attempts may leave unreferenced encrypted chunks until their share is
+cleaned up.
+
 Existing legacy single-file links continue to work. Their database ciphertext
 is cleared on expiry, revocation or one-time download, as before.
 
