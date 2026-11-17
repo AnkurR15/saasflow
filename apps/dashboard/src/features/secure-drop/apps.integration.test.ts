@@ -58,8 +58,16 @@ test("built apps serve pages and enforce Secure Drop and admin authorization ove
     assert.equal(landing.status, 200);
     assert.match(await landing.text(), /Secure Drop/);
     for (const path of ["/auth/sign-in", "/auth/sign-up", "/drop"]) assert.equal((await fetch(dashboard + path)).status, 200, path);
-    for (const path of [base, `${base}/members`, `${base}/projects`, `${base}/projects/new`, `${base}/projects/${project.id}/edit`, `${base}/secure-drop`, "/dashboard/organizations/new", `/invite/${invite.token}`]) {
-      assert.equal((await fetch(dashboard + path, { headers: { cookie: member } })).status, 200, path);
+    const protectedPages: [string, RegExp][] = [
+      [base, /HTTP smoke/], [`${base}/members`, /Members/], [`${base}/projects`, /Projects/],
+      [`${base}/projects/new`, /Create a project/], [`${base}/projects/${project.id}/edit`, /Edit project/],
+      [`${base}/secure-drop`, /Share a file securely/], ["/dashboard/organizations/new", /Create an organization/],
+      [`/invite/${invite.token}`, /You have been invited to join/],
+    ];
+    for (const [path, content] of protectedPages) {
+      const response = await fetch(dashboard + path, { headers: { cookie: member }, redirect: "manual" });
+      assert.equal(response.status, 200, path);
+      assert.match(await response.text(), content, path);
     }
     const loginRedirect = await fetch(dashboard + `/invite/${invite.token}`, { redirect: "manual" });
     assert.match(loginRedirect.headers.get("location") ?? "", /redirectTo=/);
@@ -67,8 +75,11 @@ test("built apps serve pages and enforce Secure Drop and admin authorization ove
     const foreignPage = await (await fetch(dashboard + base, { headers: { cookie: outsider } })).text();
     assert.match(foreignPage, /NEXT_HTTP_ERROR_FALLBACK;404|This page could not be found/);
     assert.doesNotMatch(foreignPage, /HTTP smoke/);
-    assert.equal((await fetch("http://127.0.0.1:3332", { headers: { cookie: member } })).status, 200);
-    assert.equal((await fetch(`http://127.0.0.1:3332/organizations/${org.id}`, { headers: { cookie: member } })).status, 200);
+    for (const [path, content] of [["/", /Organizations/], [`/organizations/${org.id}`, /HTTP smoke/]] as const) {
+      const response = await fetch("http://127.0.0.1:3332" + path, { headers: { cookie: member }, redirect: "manual" });
+      assert.equal(response.status, 200, path);
+      assert.match(await response.text(), content, path);
+    }
     const denied = await fetch("http://127.0.0.1:3332", { headers: { cookie: outsider }, redirect: "manual" });
     assert.match(denied.headers.get("location") ?? "", /unauthorized/);
     const endpoint = `${dashboard}/api/organizations/${org.id}/drops`;

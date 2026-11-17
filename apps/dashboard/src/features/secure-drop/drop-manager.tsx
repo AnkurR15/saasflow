@@ -47,24 +47,24 @@ export function DropManager({ organizationId, drops }: { organizationId: string;
   }
 
   return <div className="space-y-6">
-    <form onSubmit={upload} className="space-y-4 rounded-xl border p-6">
+    <form onSubmit={upload} className="space-y-4 rounded-xl border p-4 sm:p-6">
       <h2 className="text-lg font-semibold">Share a file securely</h2>
       <p className="text-sm text-muted-foreground">Up to 5 MiB per file and 20 active drops per organization. Anyone with the link can download once. Only share it with your intended recipient.</p>
       <p className="text-sm text-muted-foreground">Files are encrypted on the server, not end-to-end encrypted. Copy your current link before creating another drop.</p>
-      <label className="block space-y-2"><span>File</span><input className="block w-full rounded border p-2" type="file" name="file" required disabled={busy} /></label>
+      <label className="block space-y-2"><span>File</span><input className="block w-full min-w-0 rounded border p-2" type="file" name="file" required disabled={busy} /></label>
       <label className="block space-y-2"><span>Link expires in</span><select className="block rounded border bg-background p-2" name="hours" defaultValue="24" disabled={busy}>
         <option value="1">1 hour</option><option value="24">24 hours</option><option value="168">7 days</option>
       </select></label>
       <button className={button} disabled={busy}>{busy ? "Working…" : "Create secure drop"}</button>
     </form>
-    {link && <section className="space-y-3 rounded-xl border p-6">
+    {link && <section className="space-y-3 rounded-xl border p-4 sm:p-6">
       <h2 className="font-semibold">Your one-time download link</h2>
       <p className="text-sm text-muted-foreground">Copy it now. The link cannot be recovered after leaving this page.</p>
       <input aria-label="Share link" readOnly value={link} className="w-full rounded border p-2" onFocus={event => event.target.select()} />
       <button className={button} onClick={async () => { try { await navigator.clipboard.writeText(link); setMessage("Link copied."); } catch { setMessage("Select and copy the link manually."); } }}>Copy link</button>
     </section>}
     <p role="status" aria-live="polite">{message}</p>
-    <section className="space-y-3"><h2 className="text-lg font-semibold">Recent drops</h2>
+    <section className="space-y-3"><h2 className="text-lg font-semibold">Active and recent drops</h2>
       {!drops.length && <p className="text-muted-foreground">No drops yet. Upload your first file above.</p>}
       {drops.map(drop => <article key={drop.id} className="flex flex-wrap items-center justify-between gap-4 rounded-lg border p-4">
         <div className="min-w-0"><h3 className="break-all font-medium">{drop.fileName}</h3>

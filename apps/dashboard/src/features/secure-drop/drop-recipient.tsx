@@ -1,11 +1,17 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 export function DropRecipient() {
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState(false);
   const [message, setMessage] = useState("");
+
+  useEffect(() => {
+    const reset = () => { setDone(false); setMessage(""); };
+    window.addEventListener("hashchange", reset);
+    return () => window.removeEventListener("hashchange", reset);
+  }, []);
 
   async function download() {
     const token = window.location.hash.slice(1);
@@ -21,9 +27,11 @@ export function DropRecipient() {
       anchor.href = url; anchor.download = name ? decodeURIComponent(name) : "download";
       document.body.appendChild(anchor); anchor.click(); anchor.remove();
       setTimeout(() => URL.revokeObjectURL(url), 60_000);
-      window.history.replaceState(null, "", "/drop");
-      setDone(true); setMessage("Download started. This link has now been consumed.");
-    } catch (error) { setMessage(error instanceof Error ? error.message : "Download failed. If the transfer started, ask the sender for a new drop."); }
+      if (window.location.hash.slice(1) === token) {
+        window.history.replaceState(null, "", "/drop");
+        setDone(true); setMessage("Download started. This link has now been consumed.");
+      }
+    } catch (error) { if (window.location.hash.slice(1) === token) setMessage(error instanceof Error ? error.message : "Download failed. If the transfer started, ask the sender for a new drop."); }
     finally { setBusy(false); }
   }
 
