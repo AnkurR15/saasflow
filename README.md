@@ -87,6 +87,7 @@ The branch security review updated Next.js and vulnerable dependencies, removed 
 
 ```sh
 pnpm test
+pnpm test:hooks
 pnpm lint
 pnpm build
 pnpm audit
@@ -100,7 +101,7 @@ Set `RUN_APP_SMOKE=1` after building to exercise the three apps on ports 3330–
 
 ## Zeke and Git worktrees
 
-This workspace pins Zeke 0.2.2 with a Windows compatibility patch. The upstream version compares Git's forward-slash worktree path directly with the native Windows path and can report that a valid source is missing. The patch normalizes that comparison and lets Git for Windows run existing hooks with their declared interpreter.
+This workspace pins Zeke 0.2.2 with a Windows compatibility patch. The upstream version compares Git's forward-slash worktree path directly with the native Windows path and can report that a valid source is missing. The patch normalizes that comparison and lets Git for Windows run existing hooks with their declared interpreter. It explicitly forwards stdin through `git hook run --to-stdin`, including the refs checked by pre-push hooks, and removes temporary input files after the hook finishes. `pnpm test:hooks` verifies Windows forwarding, arguments, exit status and cleanup; it skips on other platforms.
 
 After installing dependencies, run **`pnpm exec zeke install`** once for the repository. Use `pnpm exec zeke doctor` to check it, `pnpm exec zeke sync` for missing ignored environment files in an existing worktree, or `pnpm exec zeke uninstall` to restore the previous hooks. These commands select the patched project copy. Existing destination files are preserved. Git 2.36+ and a supported Node or Bun runtime are required. [Upstream Zeke documentation](https://github.com/pruven/zeke)
 

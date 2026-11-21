@@ -2,14 +2,37 @@ diff --git a/dist/lib/hook.js b/dist/lib/hook.js
 index fb51f47ace541824790e48f9cd04a54d2bac0df4..95b0126115cd40e38fcdaab00c127489d8d8e9da 100644
 --- a/dist/lib/hook.js
 +++ b/dist/lib/hook.js
-@@ -11,7 +11,9 @@ try {
+@@ -1,5 +1,7 @@
+ import fs from 'node:fs';
+ import path from 'node:path';
++import os from 'node:os';
++import { isatty } from 'node:tty';
+ import { fileURLToPath } from 'node:url';
+ import { spawnSync } from 'node:child_process';
+ import { sync } from './zeke.js';
+@@ -11,7 +13,24 @@ try {
      let status = 0;
      try {
          fs.accessSync(previous, fs.constants.X_OK);
 -        const result = spawnSync(previous, args, { stdio: 'inherit' });
-+        const result = process.platform === 'win32'
-+            ? spawnSync('git', ['-c', 'core.hooksPath=' + path.dirname(previous), 'hook', 'run', hook, '--', ...args], { stdio: 'inherit' })
-+            : spawnSync(previous, args, { stdio: 'inherit' });
++        let result;
++        if (process.platform === 'win32') {
++            // Git suppresses stdin without --to-stdin; /dev/stdin is unavailable on Windows.
++            const temporary = isatty(0) ? null : fs.mkdtempSync(path.join(os.tmpdir(), 'zeke-hook-'));
++            try {
++                const stdin = temporary ? path.join(temporary, 'stdin') : 'CONIN$';
++                if (temporary)
++                    fs.writeFileSync(stdin, fs.readFileSync(0));
++                result = spawnSync('git', ['-c', 'core.hooksPath=' + path.dirname(previous), 'hook', 'run', '--to-stdin=' + stdin, hook, '--', ...args], { stdio: 'inherit' });
++            }
++            finally {
++                if (temporary)
++                    fs.rmSync(temporary, { recursive: true, force: true });
++            }
++        }
++        else {
++            result = spawnSync(previous, args, { stdio: 'inherit' });
++        }
          if (result.error)
              throw result.error;
          if (result.signal) {

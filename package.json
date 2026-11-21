@@ -8,6 +8,7 @@
         "build": "turbo build",
         "lint": "pnpm -r --if-present lint",
         "test": "pnpm --filter @repo/db test:secure-drop",
+        "test:hooks": "node --test tests/windows-hook-forwarding.test.mjs",
         "test:integration": "pnpm --filter @repo/db test:secure-drop:integration"
     },
     "devDependencies": {

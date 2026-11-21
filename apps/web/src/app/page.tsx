@@ -1,73 +1,489 @@
-import Link from "next/link";
-import { ArrowDown, ArrowUpRight, Building2, FileLock2, FolderKanban, ShieldCheck, Users } from "lucide-react";
-import { Button } from "@repo/ui/components/button";
-import { formatFileSize, MAX_SHARE_BYTES, MAX_SHARE_FILE_BYTES, MAX_SHARE_FILES, MIN_FILE_BYTES } from "@repo/types";
+﻿import Link from "next/link";
+import {
+  ArrowDown,
+  ArrowRight,
+  ArrowUpRight,
+  Building2,
+  CheckCheck,
+  Clock3,
+  Code2,
+  Database,
+  FileArchive,
+  FileLock2,
+  FolderKanban,
+  Layers3,
+  LockKeyhole,
+  Network,
+  ShieldCheck,
+  Upload,
+  Users,
+  Zap,
+} from "lucide-react";
+import {
+  formatFileSize,
+  MAX_SHARE_BYTES,
+  MAX_SHARE_FILE_BYTES,
+  MAX_SHARE_FILES,
+  MIN_FILE_BYTES,
+} from "@repo/types";
+import styles from "./page.module.css";
 
-const dashboardUrl = (process.env.NEXT_PUBLIC_DASHBOARD_URL || "http://localhost:3001").replace(/\/$/, "");
-const workspace = [
-  { icon: Building2, title: "Organizations", text: "Create a workspace for each team. Sign in with email and password, switch between organizations in the sidebar, and see the projects and people in each one." },
-  { icon: Users, title: "Members and invitations", text: "Admins can generate a seven-day invite link, replace it, change roles and remove members. New teammates join as members. Every organization keeps at least one admin." },
-  { icon: FolderKanban, title: "Projects", text: "Give projects a name and description. Any member can create and edit them. Project creators, moderators and admins can delete projects." },
-  { icon: ShieldCheck, title: "Platform administration", text: "A separate, restricted console lets the platform administrator see organization creation dates, member, project and share counts, member roles and individual project details." },
+const dashboardUrl = (
+  process.env.NEXT_PUBLIC_DASHBOARD_URL || "http://localhost:3001"
+).replace(/\/$/, "");
+const features = [
+  {
+    icon: Building2,
+    title: "A home for every team",
+    tag: "Organizations",
+    text: "Create separate organizations and switch between them. Keep each team’s people, projects and file handoffs together.",
+  },
+  {
+    icon: Users,
+    title: "The right people. The right access.",
+    tag: "Members & roles",
+    text: "Invite teammates with seven-day links. Admins manage members, moderators and admins; the last admin is protected.",
+  },
+  {
+    icon: FolderKanban,
+    title: "Keep projects in context",
+    tag: "Projects",
+    text: "Members create and edit project names and descriptions. Creators, moderators and admins can delete them. Attach file shares to a project.",
+  },
+  {
+    icon: ShieldCheck,
+    title: "Oversight at a glance",
+    tag: "Platform admin",
+    text: "A separate console lets the configured platform administrator inspect organizations, member roles, projects and share counts.",
+  },
+];
+const stack = [
+  {
+    icon: Code2,
+    name: "Next.js + React",
+    text: "Three apps: public website, team dashboard and restricted admin console.",
+  },
+  {
+    icon: Layers3,
+    name: "TypeScript + Tailwind CSS",
+    text: "Typed application code and reusable, responsive UI components.",
+  },
+  {
+    icon: Database,
+    name: "PostgreSQL + Prisma",
+    text: "Shared relational storage for accounts, organizations, projects and share metadata.",
+  },
+  {
+    icon: LockKeyhole,
+    name: "Auth.js + bcrypt",
+    text: "Email/password sign-in, hashed passwords and JWT sessions.",
+  },
+  {
+    icon: ShieldCheck,
+    name: "Arcjet + rate limits",
+    text: "Request protection with shared PostgreSQL counters when Arcjet is unconfigured.",
+  },
+  {
+    icon: Zap,
+    name: "pnpm + Turborepo",
+    text: "A monorepo that shares types, auth and UI across all three applications.",
+  },
 ];
 
 export default function HomePage() {
   return (
-    <div className="min-h-screen bg-stone-50 text-stone-950">
-      <header className="border-b border-stone-200">
-        <nav aria-label="Main navigation" className="mx-auto flex max-w-6xl items-center gap-4 px-5 py-5 sm:px-8">
-          <Link href="/" className="mr-auto text-xl font-semibold tracking-tight">SaaSFlow</Link>
-          <a href="#workspace" className="hidden text-sm hover:underline sm:inline">Workspace</a>
-          <a href="#secure-drop" className="hidden text-sm hover:underline sm:inline">Secure Drop</a>
-          <Button asChild variant="outline" size="sm"><Link href={`${dashboardUrl}/auth/sign-in`}>Sign in</Link></Button>
+    <div className={styles.page}>
+      <a href="#main" className={styles.skip}>
+        Skip to content
+      </a>
+      <header className={styles.header}>
+        <nav
+          aria-label="Main navigation"
+          className={`${styles.container} ${styles.nav}`}
+        >
+          <Link href="/" className={styles.brand}>
+            <span className={styles.brandIcon}>
+              <Layers3 size={20} aria-hidden="true" />
+            </span>
+            SaaSFlow<span className={styles.brandDot}>.</span>
+          </Link>
+          <div className={styles.navLinks}>
+            <a href="#workspace">Workspace</a>
+            <a href="#secure-drop">Secure Drop</a>
+            <a href="#technology">Under the hood</a>
+          </div>
+          <Link href={`${dashboardUrl}/auth/sign-in`} className={styles.signIn}>
+            Sign in <ArrowUpRight size={15} aria-hidden="true" />
+          </Link>
         </nav>
       </header>
-      <main>
-        <section className="mx-auto grid max-w-6xl items-center gap-10 px-5 py-14 sm:px-8 lg:grid-cols-[1.25fr_1fr] lg:gap-16 lg:py-24">
+      <main id="main">
+        <section className={`${styles.container} ${styles.hero}`}>
           <div>
-            <h1 className="max-w-2xl text-5xl font-semibold leading-[1.03] tracking-tight sm:text-6xl">A team workspace for projects and file sharing.</h1>
-            <p className="mt-6 max-w-xl text-lg leading-relaxed text-stone-600">Bring teammates into an organization, manage projects together, and send files or a folder to anyone with an expiring Secure Drop link.</p>
-            <Button asChild size="lg" className="mt-7"><Link href={`${dashboardUrl}/auth/sign-up`}>Create an account <ArrowUpRight aria-hidden="true" /></Link></Button>
+            <p className={styles.eyebrow}>
+              <span className={styles.liveDot} /> YOUR TEAM. IN FLOW.
+            </p>
+            <h1>
+              Less scattered.
+              <br />
+              More <span className={styles.gradientText}>together.</span>
+            </h1>
+            <p className={styles.intro}>
+              One workspace for your people, projects and private file handoffs.
+              Bring your team in. Keep the work moving.
+            </p>
+            <div className={styles.actions}>
+              <Link
+                href={`${dashboardUrl}/auth/sign-up`}
+                className={styles.primary}
+              >
+                Create your workspace{" "}
+                <ArrowRight size={18} aria-hidden="true" />
+              </Link>
+              <a href="#workspace" className={styles.secondary}>
+                Explore the features <ArrowDown size={16} aria-hidden="true" />
+              </a>
+            </div>
+            <p className={styles.heroNote}>
+              Team workspaces <span>·</span> Role-based access <span>·</span>{" "}
+              Expiring links
+            </p>
           </div>
-          <aside aria-label="Secure Drop transfer limits" className="rounded-2xl bg-emerald-950 p-7 text-white sm:p-9">
-            <h2 className="flex items-center gap-3 text-xl font-semibold"><FileLock2 aria-hidden="true" /> Secure Drop</h2>
-            <dl className="my-7 divide-y divide-emerald-800 border-y border-emerald-800">
-              {[
-                ["File size", `${formatFileSize(MIN_FILE_BYTES)} – ${formatFileSize(MAX_SHARE_FILE_BYTES)}`],
-                ["Files per share", `1 – ${MAX_SHARE_FILES}`],
-                ["Total per share", `Up to ${formatFileSize(MAX_SHARE_BYTES)}`],
-              ].map(([label, value]) => <div key={label} className="flex flex-wrap items-baseline justify-between gap-2 py-3">
-                <dt className="text-emerald-100">{label}</dt><dd className="font-mono font-medium">{value}</dd>
-              </div>)}
-            </dl>
-            <a href="#secure-drop" className="inline-flex items-center gap-2 text-sm underline underline-offset-4">How sharing works <ArrowDown size={15} aria-hidden="true" /></a>
-          </aside>
-        </section>
-        <section id="workspace" className="border-y border-stone-200 bg-white">
-          <div className="mx-auto max-w-6xl px-5 py-14 sm:px-8">
-            <h2 className="text-3xl font-semibold tracking-tight">Inside the workspace</h2>
-            <div className="mt-8 grid gap-x-12 gap-y-8 md:grid-cols-2">
-              {workspace.map(({ icon: Icon, title, text }) => <article key={title}>
-                <h3 className="flex items-center gap-3 text-lg font-semibold"><Icon size={21} className="text-emerald-800" aria-hidden="true" />{title}</h3>
-                <p className="mt-2 max-w-lg leading-relaxed text-stone-600">{text}</p>
-              </article>)}
+          <div className={styles.previewWrap}>
+            <div
+              className={styles.preview}
+              aria-label="Illustrative workspace preview with example data"
+            >
+              <div className={styles.previewTop}>
+                <div className={styles.windowDots} aria-hidden="true">
+                  <i />
+                  <i />
+                  <i />
+                </div>
+                <span>Workspace preview · example data</span>
+                <LockKeyhole size={12} aria-hidden="true" />
+              </div>
+              <div className={styles.previewBody}>
+                <div className={styles.previewSidebar} aria-hidden="true">
+                  <span className={styles.miniBrand}>
+                    <Layers3 size={17} /> Acme studio
+                  </span>
+                  <span className={styles.selected}>
+                    <FolderKanban size={14} /> Projects
+                  </span>
+                  <span>
+                    <Users size={14} /> Members
+                  </span>
+                  <span>
+                    <FileLock2 size={14} /> Secure Drop
+                  </span>
+                  <div className={styles.sidebarBottom}>
+                    A space for good work.
+                  </div>
+                </div>
+                <div className={styles.previewContent}>
+                  <div className={styles.previewLabel}>
+                    ACME STUDIO / OVERVIEW
+                  </div>
+                  <h2>Your next big thing.</h2>
+                  <p>Good people. Everything in one place.</p>
+                  <div className={styles.miniStats}>
+                    <div>
+                      <strong>03</strong>
+                      <span>Projects</span>
+                    </div>
+                    <div>
+                      <strong>08</strong>
+                      <span>Teammates</span>
+                    </div>
+                    <div>
+                      <strong>02</strong>
+                      <span>Active drops</span>
+                    </div>
+                  </div>
+                  <div className={styles.projectRow}>
+                    <span className={styles.projectIcon}>
+                      <FolderKanban size={18} aria-hidden="true" />
+                    </span>
+                    <div>
+                      <strong>Website refresh</strong>
+                      <span>Design & development</span>
+                    </div>
+                  </div>
+                  <div className={styles.projectRow}>
+                    <span className={styles.projectIcon}>
+                      <FileArchive size={18} aria-hidden="true" />
+                    </span>
+                    <div>
+                      <strong>Client handoff</strong>
+                      <span>Assets, ready to share</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div className={styles.floatingDrop}>
+              <span className={styles.successIcon}>
+                <CheckCheck size={20} aria-hidden="true" />
+              </span>
+              <div>
+                <strong>Handoff, handled.</strong>
+                <span>Secure Drop · link ready to share</span>
+              </div>
+              <ShieldCheck size={19} aria-hidden="true" />
             </div>
           </div>
         </section>
-        <section id="secure-drop" className="mx-auto grid max-w-6xl gap-6 px-5 py-14 sm:px-8 lg:grid-cols-[1fr_2fr]">
-          <h2 className="text-3xl font-semibold tracking-tight">Sharing with Secure Drop</h2>
-          <div className="space-y-5 leading-relaxed text-stone-700">
-            <p><strong className="text-stone-950">Prepare the files.</strong> Pick files or a folder, review the selection, and optionally attach it to a project. Folder paths are preserved. Upload progress is shown as chunks arrive, and interrupted chunks can be retried.</p>
-            <p><strong className="text-stone-950">Set access.</strong> Choose 1 hour, 24 hours or 7 days from publication. Allow repeat downloads or one claim per file. Copy the link when the upload finishes. Anyone with the link can view the list and download individual files without an account.</p>
-            <p><strong className="text-stone-950">Manage a handoff.</strong> Senders see download counts, status and expiry, and can revoke their links. Organization admins can review and revoke team shares. Opening the list leaves one-time claims available. A failed transfer after a claim may need a new link.</p>
-            <details className="rounded-lg border border-stone-300 bg-white px-5 py-3">
-              <summary className="cursor-pointer font-medium text-stone-950">Storage, privacy and quotas</summary>
-              <p className="mt-3">Each organization can have 20 active shares or drafts and reserve up to 50 GiB. Drafts expire after 24 hours. Expired and revoked data counts toward storage until cleanup removes it.</p>
-              <p className="mt-3">The server encrypts file contents at rest with AES-256-GCM and can decrypt them for delivery. The server stores a hash of each share token. File names and sizes are visible to the service. Share links grant access by possession, and files have no malware scan.</p>
+        <section
+          className={`${styles.container} ${styles.useCases}`}
+          aria-label="What SaaSFlow is useful for"
+        >
+          <span>BUILT FOR THE HANDOFF</span>
+          <p>
+            <FolderKanban size={17} aria-hidden="true" /> Small team projects
+          </p>
+          <p>
+            <Users size={17} aria-hidden="true" /> Client collaboration
+          </p>
+          <p>
+            <FileArchive size={17} aria-hidden="true" /> Design & asset delivery
+          </p>
+        </section>
+        <section
+          id="workspace"
+          className={`${styles.container} ${styles.section}`}
+        >
+          <div className={styles.sectionHeading}>
+            <div>
+              <p className={styles.eyebrow}>01 / THE WORKSPACE</p>
+              <h2>Give the work a home.</h2>
+            </div>
+            <p>
+              From the first invite to the final file.
+              <br />
+              The essentials, without the clutter.
+            </p>
+          </div>
+          <div className={styles.featureGrid}>
+            {features.map(({ icon: Icon, title, tag, text }, i) => (
+              <article key={tag} className={styles.featureCard}>
+                <div className={styles.cardTop}>
+                  <span className={styles.iconBox}>
+                    <Icon size={22} aria-hidden="true" />
+                  </span>
+                  <span className={styles.cardNumber}>0{i + 1}</span>
+                </div>
+                <span className={styles.tag}>{tag}</span>
+                <h3>{title}</h3>
+                <p>{text}</p>
+              </article>
+            ))}
+          </div>
+        </section>
+        <section
+          id="secure-drop"
+          className={`${styles.container} ${styles.section}`}
+        >
+          <div className={styles.dropPanel}>
+            <div className={styles.dropIntro}>
+              <p className={styles.eyebrow}>
+                <FileLock2 size={16} aria-hidden="true" /> 02 / SECURE DROP
+              </p>
+              <h2>
+                Big files.
+                <br />
+                Small window.
+                <br />
+                <span className={styles.gradientText}>Your control.</span>
+              </h2>
+              <p>
+                Send files or a folder with an expiring link. Recipients browse
+                and download individual files without creating an account.
+              </p>
+              <a
+                href={`${dashboardUrl}/auth/sign-in`}
+                className={styles.textLink}
+              >
+                Open Secure Drop <ArrowUpRight size={17} aria-hidden="true" />
+              </a>
+              <div className={styles.dropBadge}>
+                <ShieldCheck size={16} aria-hidden="true" /> AES-256-GCM
+                encryption at rest
+              </div>
+            </div>
+            <div className={styles.dropDetails}>
+              <ol className={styles.steps}>
+                {[
+                  {
+                    icon: Upload,
+                    title: "Pick it. Upload it.",
+                    text: "Select files or a folder; paths stay intact. Optionally attach a project. Watch chunked upload progress with retries for interrupted chunks.",
+                  },
+                  {
+                    icon: Clock3,
+                    title: "Set the window.",
+                    text: "Choose 1 hour, 24 hours or 7 days from publication. Allow repeat downloads or one claim per file, then copy the finished link.",
+                  },
+                  {
+                    icon: CheckCheck,
+                    title: "Share. Track. Revoke.",
+                    text: "See expiry, status and download counts. Revoke your links anytime; organization admins can also review and revoke team shares.",
+                  },
+                ].map(({ icon: Icon, title, text }, i) => (
+                  <li key={title}>
+                    <span className={styles.stepIcon}>
+                      <Icon size={19} aria-hidden="true" />
+                    </span>
+                    <div>
+                      <span className={styles.stepNumber}>STEP 0{i + 1}</span>
+                      <h3>{title}</h3>
+                      <p>{text}</p>
+                    </div>
+                  </li>
+                ))}
+              </ol>
+              <dl className={styles.limits}>
+                {[
+                  [formatFileSize(MAX_SHARE_FILE_BYTES), "per file"],
+                  [String(MAX_SHARE_FILES), "files per share"],
+                  [formatFileSize(MAX_SHARE_BYTES), "per share"],
+                ].map(([value, label]) => (
+                  <div key={label}>
+                    <dt>{label}</dt>
+                    <dd>{value}</dd>
+                  </div>
+                ))}
+              </dl>
+              <p className={styles.limitNote}>
+                Files from {formatFileSize(MIN_FILE_BYTES)}. Folders preserve
+                paths; empty directories are omitted.
+              </p>
+            </div>
+          </div>
+          <div className={styles.faqs}>
+            <details>
+              <summary>What does “secure” mean here?</summary>
+              <p>
+                Files are encrypted on the server at rest; the server can
+                decrypt them for delivery. Share tokens are stored as hashes.
+                File names and sizes remain visible to the service. Anyone
+                holding a link has access: keep it private. Recipient identity
+                is not verified, and files are not scanned for malware.
+              </p>
+            </details>
+            <details>
+              <summary>How do one-time downloads and revocation work?</summary>
+              <p>
+                Viewing the list does not claim files. Starting a download uses
+                that file’s one-time claim, even if the transfer later fails; a
+                new share may be needed. Revocation blocks new downloads; an
+                already running response can finish. Closing the browser
+                interrupts unfinished uploads.
+              </p>
+            </details>
+            <details>
+              <summary>What are the workspace storage limits?</summary>
+              <p>
+                Each organization can hold 20 active shares or drafts and
+                reserve up to 50 GiB. Drafts expire after 24 hours. Expired or
+                revoked files count toward storage until scheduled cleanup
+                removes them.
+              </p>
             </details>
           </div>
         </section>
+        <section
+          id="technology"
+          className={`${styles.container} ${styles.section}`}
+        >
+          <div className={styles.sectionHeading}>
+            <div>
+              <p className={styles.eyebrow}>03 / UNDER THE HOOD</p>
+              <h2>A modern stack. A clear purpose.</h2>
+            </div>
+            <p>
+              Three focused apps.
+              <br />
+              One shared foundation.
+            </p>
+          </div>
+          <div className={styles.stackGrid}>
+            {stack.map(({ icon: Icon, name, text }) => (
+              <article key={name} className={styles.stackCard}>
+                <Icon size={20} aria-hidden="true" />
+                <div>
+                  <h3>{name}</h3>
+                  <p>{text}</p>
+                </div>
+              </article>
+            ))}
+          </div>
+          <div className={styles.networkPanel}>
+            <span className={styles.iconBox}>
+              <Network size={23} aria-hidden="true" />
+            </span>
+            <div>
+              <p className={styles.eyebrow}>OPTIONAL / SELF-HOSTING</p>
+              <h3>Tailscale connects the infrastructure.</h3>
+              <p>
+                Tailscale creates a private encrypted network called a{" "}
+                <strong>tailnet</strong>. Install it on your hosting device and
+                approved teammates’ devices, then use network access policies to
+                control who can connect. It is an optional deployment choice,
+                not a built-in SaaSFlow integration.
+              </p>
+              <div className={styles.networkModes}>
+                <p>
+                  <strong>Tailscale Serve</strong> exposes a local web service
+                  to your tailnet. Visitors need network access as well as
+                  SaaSFlow permissions.
+                </p>
+                <p>
+                  <strong>Tailscale Funnel</strong> exposes a local service to
+                  the public internet. A public Secure Drop recipient can open
+                  the link without Tailscale.
+                </p>
+              </div>
+              <p className={styles.networkNote}>
+                SaaSFlow sign-in and roles still apply. Configure the deployed
+                app URLs and Secure Drop origin to match your host.
+              </p>
+              <a
+                href="https://tailscale.com/docs/features/tailscale-serve"
+                className={styles.textLink}
+              >
+                Serve docs <ArrowUpRight size={14} aria-hidden="true" />
+              </a>
+              <a
+                href="https://tailscale.com/docs/features/tailscale-funnel"
+                className={styles.textLink}
+              >
+                Funnel docs <ArrowUpRight size={14} aria-hidden="true" />
+              </a>
+            </div>
+          </div>
+        </section>
+        <section className={`${styles.container} ${styles.cta}`}>
+          <p className={styles.eyebrow}>LESS FRICTION. MORE FLOW.</p>
+          <h2>Your next project starts here.</h2>
+          <p>Create an account, bring your team and make the first handoff.</p>
+          <Link
+            href={`${dashboardUrl}/auth/sign-up`}
+            className={styles.primary}
+          >
+            Get started with SaaSFlow{" "}
+            <ArrowRight size={18} aria-hidden="true" />
+          </Link>
+        </section>
       </main>
+      <footer className={`${styles.container} ${styles.footer}`}>
+        <Link href="/" className={styles.brand}>
+          <Layers3 size={19} aria-hidden="true" /> SaaSFlow
+          <span className={styles.brandDot}>.</span>
+        </Link>
+        <p>People, projects and handoffs. In flow.</p>
+        <a href="#main">Back to top ↑</a>
+      </footer>
     </div>
   );
 }
