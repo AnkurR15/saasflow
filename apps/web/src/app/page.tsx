@@ -13,7 +13,6 @@ import {
   FolderKanban,
   Layers3,
   LockKeyhole,
-  Network,
   ShieldCheck,
   Upload,
   Users,
@@ -474,54 +473,43 @@ export default function HomePage() {
               </article>
             ))}
           </div>
-          <div className={styles.networkPanel}>
+          <div className={styles.architecturePanel}>
             <span className={styles.iconBox}>
-              <Network size={23} aria-hidden="true" />
+              <FileLock2 size={23} aria-hidden="true" />
             </span>
             <div>
-              <p className={styles.eyebrow}>OPTIONAL / SELF-HOSTING</p>
-              <h3>Tailscale connects the infrastructure.</h3>
+              <p className={styles.eyebrow}>HOW SECURE DROP IS BUILT</p>
+              <h3>Your browser. Our server. A simple handoff.</h3>
               <p>
-                Tailscale creates a private encrypted network called a{" "}
-                <strong>tailnet</strong>. Install it on your hosting device and
-                approved teammates’ devices, then use network access policies to
-                control who can connect. It is an optional deployment choice,
-                not a built-in SaaSFlow integration.
+                Secure Drop is built into SaaSFlow using Next.js server APIs,
+                Node.js and PostgreSQL. Upload once, share the link and let
+                recipients download later?even when you are offline.
               </p>
-              <div className={styles.networkModes}>
+              <div className={styles.architectureModes}>
                 <p>
-                  <strong>Tailscale Serve</strong> exposes a local web service
-                  to your tailnet. Visitors need network access as well as
-                  SaaSFlow permissions.
+                  <strong>01 / Upload in pieces</strong> Your browser sends 4
+                  MiB chunks with progress updates and retries for interrupted
+                  requests. The server checks your account, team access and file
+                  limits before accepting the upload.
                 </p>
                 <p>
-                  <strong>Tailscale Funnel</strong> exposes a local service to
-                  the public internet. A public Secure Drop recipient can open
-                  the link without Tailscale.
+                  <strong>02 / Store encrypted</strong> Node.js encrypts file
+                  chunks with AES-256-GCM on private persistent disk. Prisma
+                  records file details, upload progress and access rules in
+                  PostgreSQL; only a hash of the share token is stored.
+                </p>
+                <p>
+                  <strong>03 / Deliver on demand</strong> The server checks the
+                  link?s expiry and download policy, then decrypts and streams
+                  the file to the recipient. Scheduled cleanup removes eligible
+                  expired or revoked files.
                 </p>
               </div>
-              <p className={styles.networkNote}>
-                Taildrop is Tailscale’s file-transfer feature for your own
-                personal devices running Tailscale. Secure Drop instead stores
-                files on the SaaSFlow server for later browser downloads; it
-                does not use Taildrop or peer-to-peer transfers.
+              <p className={styles.architectureNote}>
+                The server can decrypt files for delivery. Anyone with the link
+                can access it until its policy blocks access. No recipient
+                account or extra software is required.
               </p>
-              <p className={styles.networkNote}>
-                SaaSFlow sign-in and roles still apply. Configure the deployed
-                app URLs and Secure Drop origin to match your host.
-              </p>
-              <a
-                href="https://tailscale.com/docs/features/tailscale-serve"
-                className={styles.textLink}
-              >
-                Serve docs <ArrowUpRight size={14} aria-hidden="true" />
-              </a>
-              <a
-                href="https://tailscale.com/docs/features/tailscale-funnel"
-                className={styles.textLink}
-              >
-                Funnel docs <ArrowUpRight size={14} aria-hidden="true" />
-              </a>
             </div>
           </div>
         </section>
