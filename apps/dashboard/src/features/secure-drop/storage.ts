@@ -4,14 +4,10 @@ import { randomUUID } from "node:crypto";
 import { decryptFile, encryptFile } from "./crypto";
 import { DropError, parseFileName } from "./http";
 
-export const CHUNK_BYTES = 4 * 1024 * 1024;
-export const MAX_SHARE_FILE_BYTES = 5 * 1024 ** 3;
-export const MAX_SHARE_BYTES = 20 * 1024 ** 3;
 export const MAX_ORGANIZATION_BYTES = 50 * 1024 ** 3;
-export const MAX_SHARE_FILES = 200;
 
 export function parseRelativePath(value: unknown) {
-  if (typeof value !== "string" || value.length > 1024) throw new DropError(400, "Invalid file path.");
+  if (typeof value !== "string" || value.length > 1024 || !value.isWellFormed()) throw new DropError(400, "Invalid file path.");
   const parts = value.split("/");
   if (parts.length > 20) throw new DropError(400, "Folders may be at most 20 levels deep.");
   return parts.map(part => parseFileName(encodeURIComponent(part))).join("/");

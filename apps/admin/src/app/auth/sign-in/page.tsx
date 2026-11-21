@@ -6,7 +6,7 @@ export default async function AdminSignInPage({ searchParams }: { searchParams: 
     <div className="min-h-screen flex items-center justify-center">
       <div className="w-full max-w-md p-8 space-y-6">
         <h1 className="text-2xl font-semibold text-center">Admin sign in</h1>
-        {error && <p role="alert">Sign in failed. Check your email and password and try again.</p>}
+        {error && <p role="alert">{error === "rate_limit" ? "Too many sign-in attempts. Try again in a minute." : error === "unavailable" ? "Sign-in is temporarily unavailable." : "Sign in failed. Check your email and password and try again."}</p>}
         <form
           action={adminSignIn}
           className="space-y-4"

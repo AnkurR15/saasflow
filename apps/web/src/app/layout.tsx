@@ -14,7 +14,7 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "SaaSFlow | Team projects and secure file sharing",
-  description: "Organize your team, manage projects and send files with expiring, one-time download links.",
+  description: "Manage organizations, members and projects. Share files or folders through expiring Secure Drop links with once-per-file or repeat downloads.",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

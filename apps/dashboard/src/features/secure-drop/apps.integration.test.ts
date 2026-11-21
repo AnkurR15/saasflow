@@ -1,18 +1,32 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { randomBytes, randomUUID } from "node:crypto";
+import { createHmac, randomBytes, randomUUID } from "node:crypto";
 import { spawn, type ChildProcess } from "node:child_process";
 import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
 import { encode } from "next-auth/jwt";
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp, rm, stat } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
+import { verifyTransferBoundaries } from "./transfer-boundaries.test-helper";
+import type { Prisma } from "@repo/db";
+
+async function waitForBlockedRequest(tx: Prisma.TransactionClient, pid: number) {
+  const deadline = Date.now() + 5_000;
+  while (Date.now() < deadline) {
+    const [result] = await tx.$queryRaw<{ waiting: boolean }[]>`
+      SELECT EXISTS (SELECT 1 FROM pg_locks WHERE NOT granted AND ${pid}::int = ANY(pg_blocking_pids(pid))) AS waiting
+    `;
+    if (result.waiting) return;
+    await new Promise(resolve => setTimeout(resolve, 25));
+  }
+  assert.fail("Expected the request to wait for the database transaction");
+}
 
 // Run explicitly after building all apps. Uses only the supplied disposable database.
 test("built apps serve pages and enforce Secure Drop and admin authorization over HTTP", {
   skip: !process.env.RUN_APP_SMOKE || !process.env.SECURE_DROP_TEST_DATABASE_URL,
-  timeout: 120_000,
+  timeout: process.env.RUN_SECURE_DROP_LARGE === "1" ? 60 * 60_000 : 180_000,
 }, async () => {
   process.env.DATABASE_URL = process.env.SECURE_DROP_TEST_DATABASE_URL;
   const { prisma } = await import("@repo/db");
@@ -21,6 +35,8 @@ test("built apps serve pages and enforce Secure Drop and admin authorization ove
   const processes: ChildProcess[] = [];
   const userIds: string[] = [];
   let organizationId: string | undefined;
+  const loginBucket = createHmac("sha256", secret).update("signIn:ip:shared").digest("hex");
+  let uploadBucket: string | undefined;
   const root = fileURLToPath(new URL("../../../../../", import.meta.url));
   const origin = "https://drop.example.test";
   const storage = await mkdtemp(path.join(tmpdir(), "secure-share-test-"));
@@ -33,6 +49,7 @@ test("built apps serve pages and enforce Secure Drop and admin authorization ove
         AUTH_URL: `http://127.0.0.1:${port}`, ADMIN_USER_ID: adminId,
         SECURE_DROP_APP_ORIGIN: origin, SECURE_DROP_ENCRYPTION_KEY: randomBytes(32).toString("hex"),
         SECURE_DROP_STORAGE_DIR: storage,
+        ARCJET_KEY: "", RATE_LIMIT_IP_HEADER: "",
       },
     });
     processes.push(child);
@@ -89,6 +106,19 @@ test("built apps serve pages and enforce Secure Drop and admin authorization ove
     }
     const denied = await fetch("http://127.0.0.1:3332", { headers: { cookie: outsider }, redirect: "manual" });
     assert.match(denied.headers.get("location") ?? "", /unauthorized/);
+    await prisma.$executeRaw`
+      INSERT INTO "RequestRateLimit" ("bucket", "hits", "expiresAt") VALUES (${loginBucket}, 10, statement_timestamp() + interval '1 minute')
+    `;
+    for (const app of [dashboard, "http://127.0.0.1:3332"]) {
+      const csrf = await fetch(app + "/api/auth/csrf");
+      const { csrfToken } = await csrf.json();
+      const cookies = csrf.headers.getSetCookie().map(value => value.split(";")[0]).join("; ");
+      const login = await fetch(app + "/api/auth/callback/credentials", {
+        method: "POST", redirect: "manual", headers: { cookie: cookies },
+        body: new URLSearchParams({ csrfToken, email: "fixture@example.test", password: "fixture-only" }),
+      });
+      assert.match(login.headers.get("location") ?? "", /code=rate_limit/, "direct credential callbacks must honor the login budget");
+    }
     const endpoint = `${dashboard}/api/organizations/${org.id}/drops`;
     const headers = { origin, cookie: member, "x-file-name": "sample.txt", "x-expires-hours": "1" };
     assert.equal((await fetch(endpoint, { method: "POST", headers: { ...headers, cookie: outsider }, body: "secret" })).status, 404);
@@ -139,19 +169,7 @@ test("built apps serve pages and enforce Secure Drop and admin authorization ove
       const [{ pid }] = await tx.$queryRaw<{ pid: number }[]>`SELECT pg_backend_pid() AS pid`;
       await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`secure-share-org:${org.id}`}))`;
       pendingPublish = fetch(`${shares}/${expiring.id}`, { method: "POST", headers: { origin, cookie: member } }).then(response => { completed = true; return response; });
-      const deadline = Date.now() + 5_000;
-      let waiting = false;
-      while (!waiting && !completed && Date.now() < deadline) {
-        const [result] = await prisma.$queryRaw<{ waiting: boolean }[]>`
-          SELECT EXISTS (
-            SELECT 1 FROM pg_locks
-            WHERE locktype = 'advisory' AND NOT granted
-              AND ${pid}::int = ANY(pg_blocking_pids(pid))
-          ) AS waiting`;
-        waiting = result.waiting;
-        if (!waiting) await new Promise(resolve => setTimeout(resolve, 25));
-      }
-      assert.equal(waiting, true, "publication must be waiting on this transaction's advisory lock");
+      await waitForBlockedRequest(tx, pid);
       assert.equal(completed, false, "publication must wait for the organization reservation lock");
       await tx.secureShare.update({ where: { id: expiring.id }, data: { expiresAt: new Date(Date.now() - 1000) } });
     }, { timeout: 10_000 });
@@ -169,6 +187,20 @@ test("built apps serve pages and enforce Secure Drop and admin authorization ove
     const largeId = draft.files.find((file: { path: string }) => file.path.endsWith("large.pdf")).id;
     const smallId = draft.files.find((file: { path: string }) => file.path.endsWith("data.xlsx")).id;
     assert.equal((await chunk(largeId, 1, large.subarray(-3))).status, 409);
+    uploadBucket = createHmac("sha256", secret).update(`uploadChunk:user:${userIds[0]}`).digest("hex");
+    await prisma.$executeRaw`
+      UPDATE "RequestRateLimit" SET "hits" = 160, "expiresAt" = statement_timestamp() + interval '10 seconds'
+      WHERE "bucket" = ${uploadBucket}
+    `;
+    const throttled = await chunk(largeId, 0, large.subarray(0, -3));
+    assert.equal(throttled.status, 429);
+    assert.equal(throttled.headers.get("retry-after"), "10");
+    assert.equal(await prisma.secureShareChunk.count({ where: { fileId: largeId } }), 0);
+    assert.equal((await prisma.secureShareFile.findUniqueOrThrow({ where: { id: largeId } })).uploadedSize, BigInt(0));
+    await assert.rejects(stat(path.join(storage, draft.id, largeId)), { code: "ENOENT" });
+    await prisma.$executeRaw`
+      UPDATE "RequestRateLimit" SET "expiresAt" = statement_timestamp() WHERE "bucket" = ${uploadBucket}
+    `;
     assert.equal((await chunk(largeId, 0, large.subarray(0, -3))).status, 204);
     assert.equal((await chunk(largeId, 0, large.subarray(0, -3))).status, 204);
     assert.equal((await chunk(largeId, 0, Buffer.alloc(4 * 1024 * 1024, 0x43))).status, 409);
@@ -208,10 +240,43 @@ test("built apps serve pages and enforce Secure Drop and admin authorization ove
     const memberPage = await (await fetch(dashboard + `${base}/secure-drop`, { headers: { cookie: teammate } })).text();
     assert.match(memberPage, /team-only\.txt/);
     assert.doesNotMatch(memberPage, /again\.txt/);
+    const adminMembership = { userId_organizationId: { userId: userIds[0], organizationId: org.id } };
+    let pendingRevoke: Promise<Response> | undefined;
+    await prisma.$transaction(async tx => {
+      const [{ pid }] = await tx.$queryRaw<{ pid: number }[]>`SELECT pg_backend_pid() AS pid`;
+      await tx.organizationMembership.update({ where: adminMembership, data: { role: "MEMBER" } });
+      pendingRevoke = fetch(`${shares}/${teamDraft.id}`, { method: "DELETE", headers: { origin, cookie: member } });
+      await waitForBlockedRequest(tx, pid);
+    }, { timeout: 10_000 });
+    assert.equal((await pendingRevoke!).status, 404, "a demoted admin cannot revoke a teammate's share");
+    await prisma.organizationMembership.update({ where: adminMembership, data: { role: "ADMIN" } });
     assert.equal((await fetch(`${shares}/${teamDraft.id}`, { method: "DELETE", headers: { origin, cookie: member } })).status, 204);
     assert.equal((await getFile(teamDraft.files[0].id, teamToken)).status, 404);
+
+    const pendingDraftResponse = await create({ files: [{ path: "pending-chunk.bin", size: 1 }], hours: 1, downloadOnce: true }, teammate);
+    assert.equal(pendingDraftResponse.status, 201);
+    const pendingDraft = await pendingDraftResponse.json();
+    const pendingFileId = pendingDraft.files[0].id;
+    const pendingUrl = `${shares}/${pendingDraft.id}/files/${pendingFileId}`;
+    const sendPendingChunk = () => fetch(pendingUrl, {
+      method: "PUT", headers: { origin, cookie: teammate, "x-chunk-index": "0" }, body: "x",
+    });
+    let pendingUpload: Promise<Response> | undefined;
+    await prisma.$transaction(async tx => {
+      const [{ pid }] = await tx.$queryRaw<{ pid: number }[]>`SELECT pg_backend_pid() AS pid`;
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`secure-share:${pendingDraft.id}`}))`;
+      pendingUpload = sendPendingChunk();
+      await waitForBlockedRequest(tx, pid);
+      await tx.organizationMembership.delete({ where: { userId_organizationId: { userId: userIds[2], organizationId: org.id } } });
+    }, { timeout: 10_000 });
+    assert.equal((await pendingUpload!).status, 404, "a queued upload must stop after its sender is removed");
+    assert.equal(await prisma.secureShareChunk.count({ where: { fileId: pendingFileId } }), 0);
+    assert.equal((await prisma.secureShareFile.findUniqueOrThrow({ where: { id: pendingFileId } })).uploadedSize, BigInt(0));
+    await assert.rejects(stat(path.join(storage, pendingDraft.id)), { code: "ENOENT" });
+    await verifyTransferBoundaries(shares, origin, member, process.env.RUN_SECURE_DROP_LARGE === "1");
   } finally {
     for (const child of processes) child.kill();
+    await prisma.requestRateLimit.deleteMany({ where: { bucket: { in: uploadBucket ? [loginBucket, uploadBucket] : [loginBucket] } } });
     if (organizationId) await prisma.organization.delete({ where: { id: organizationId } });
     await prisma.user.deleteMany({ where: { id: { in: userIds } } });
     await prisma.$disconnect();

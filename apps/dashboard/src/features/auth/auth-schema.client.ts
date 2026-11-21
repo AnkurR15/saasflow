@@ -19,7 +19,8 @@ export const signUpSchema = z.object({
     password: z
         .string()
         .nonempty("Password is required")
-        .min(6, "Password must be at least 6 characters long"),
+        .min(6, "Password must be at least 6 characters long")
+        .refine(password => new TextEncoder().encode(password).length <= 72, "Use a password of at most 72 UTF-8 bytes."),
     confirmPassword: z
         .string()
         .nonempty("Confirm password is required")

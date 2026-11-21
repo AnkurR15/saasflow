@@ -6,6 +6,9 @@
 > database-backed implementation; see [Secure Drop](secure-drop.md) for current
 > limits, deployment requirements, and security boundaries.
 
+The audit and launch checklist below are historical. Current capabilities,
+request budgets, and verification commands are in the [repository README](../README.md).
+
 ## What is implemented
 
 This is a Next.js/React/TypeScript monorepo with PostgreSQL, Prisma, Auth.js,

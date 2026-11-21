@@ -1,6 +1,7 @@
 ﻿import { prisma } from "@repo/db";
-import { authorizeShare } from "@/features/secure-drop/share-auth";
-import { CHUNK_BYTES, readChunk, writeChunk } from "@/features/secure-drop/storage";
+import { authorizeShare, lockShareMembership } from "@/features/secure-drop/share-auth";
+import { readChunk, writeChunk } from "@/features/secure-drop/storage";
+import { CHUNK_BYTES } from "@repo/types";
 import { DropError, failure, privateHeaders, readLimited } from "@/features/secure-drop/http";
 
 export const runtime = "nodejs";
@@ -9,13 +10,14 @@ type Context = { params: Promise<{ organizationId: string; shareId: string; file
 export async function PUT(request: Request, context: Context) {
   try {
     const { organizationId, shareId, fileId } = await context.params;
-    const member = await authorizeShare(request, organizationId);
+    const member = await authorizeShare(request, organizationId, "uploadChunk");
     const indexText = request.headers.get("x-chunk-index");
     if (!indexText || !/^(0|[1-9]\d*)$/.test(indexText) || !Number.isSafeInteger(Number(indexText))) throw new DropError(400, "Invalid chunk index.");
     const index = Number(indexText);
     const bytes = await readLimited(request, CHUNK_BYTES);
     await prisma.$transaction(async tx => {
       await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`secure-share:${shareId}`}))`;
+      await lockShareMembership(tx, member.id);
       const file = await tx.secureShareFile.findFirst({ where: { id: fileId, shareId, share: { organizationId, createdById: member.userId, publishedAt: null, revokedAt: null, expiresAt: { gt: new Date() } } } });
       if (!file) throw new DropError(404, "Upload not found or no longer available.");
       const offset = BigInt(index) * BigInt(CHUNK_BYTES);

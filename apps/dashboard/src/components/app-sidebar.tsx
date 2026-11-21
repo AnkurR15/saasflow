@@ -24,7 +24,6 @@ import {
 import {
   FolderKanban,
   Users,
-  Settings,
   ChevronsUpDown,
   Plus,
   ShieldCheck,
@@ -48,7 +47,6 @@ const navLinks = [
   { label: "Secure Drop", icon: ShieldCheck, href: "secure-drop" },
   { label: "Projects", icon: FolderKanban, href: "projects" },
   { label: "Members", icon: Users, href: "members" },
-  { label: "Settings", icon: Settings, href: "settings" },
 ];
 
 function parseOrgSlugFromPathname(pathname: string): string | undefined {

@@ -1,7 +1,8 @@
 import { prisma } from "@repo/db";
-import NextAuth from "next-auth";
+import NextAuth, { CredentialsSignin } from "next-auth";
 import bcrypt from "bcryptjs";
 import Credentials from "next-auth/providers/credentials";
+import { checkRateLimit } from "./rate-limit";
 
 export async function verifyPassword(
     password: string,
@@ -18,7 +19,13 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
                 email: { label: "Email", type: "email" },
                 password: { label: "Password", type: "password" },
             },
-            async authorize(credentials) {
+            async authorize(credentials, request) {
+                const rejected = await checkRateLimit("signIn", request.headers);
+                if (rejected) {
+                    const error = new CredentialsSignin();
+                    error.code = rejected.status === 429 ? "rate_limit" : "unavailable";
+                    throw error;
+                }
                 if (typeof credentials?.email !== "string" || typeof credentials?.password !== "string") return null;
 
                 const email = String(credentials.email).toLowerCase().trim();

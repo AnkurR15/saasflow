@@ -2,23 +2,12 @@
 
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { sendChunk } from "./chunk-upload";
+import { uploadChunk } from "./chunk-upload";
+import { CHUNK_BYTES, MAX_SHARE_BYTES, MAX_SHARE_FILE_BYTES, MAX_SHARE_FILES, MIN_FILE_BYTES, formatFileSize as formatSize } from "@repo/types";
 
 type Drop = { id: string; title: string; size: number; expiresAt: string; status: string; canRevoke: boolean; project?: string; sender: string; mode: string; legacy: boolean; downloads: number };
 type Selected = { file: File; path: string };
 const button = "rounded-md bg-primary px-4 py-2 text-primary-foreground disabled:opacity-50";
-const CHUNK_BYTES = 4 * 1024 * 1024;
-function formatSize(size: number) { return size >= 1024 ** 3 ? `${(size / 1024 ** 3).toFixed(2)} GiB` : size >= 1024 ** 2 ? `${(size / 1024 ** 2).toFixed(1)} MiB` : `${(size / 1024).toFixed(1)} KiB`; }
-
-async function uploadChunk(url: string, blob: Blob, index: number, progress: (bytes: number) => void) {
-  for (let attempt = 0; ; attempt++) {
-    try { await sendChunk(url, blob, index, progress); return; }
-    catch (error) {
-      if (attempt >= 2 || !(error instanceof Error && "retryable" in error && error.retryable)) throw error;
-      await new Promise(resolve => setTimeout(resolve, 1000 * (attempt + 1)));
-    }
-  }
-}
 
 export function DropManager({ organizationId, organizationName, projects, drops, isAdmin }: { organizationId: string; organizationName: string; projects: { id: string; name: string }[]; drops: Drop[]; isAdmin: boolean }) {
   const router = useRouter();
@@ -42,8 +31,8 @@ export function DropManager({ organizationId, organizationName, projects, drops,
     event.preventDefault();
     const form = event.currentTarget;
     const data = new FormData(form);
-    if (!files.length || files.length > 200 || files.some(item => !item.file.size || item.file.size > 5 * 1024 ** 3) || total > 20 * 1024 ** 3) {
-      setMessage("Select 1–200 non-empty files, up to 5 GiB each and 20 GiB per share."); return;
+    if (!files.length || files.length > MAX_SHARE_FILES || files.some(item => item.file.size < MIN_FILE_BYTES || item.file.size > MAX_SHARE_FILE_BYTES) || total > MAX_SHARE_BYTES) {
+      setMessage("Select 1–200 files, 1 byte to 5 GiB each and up to 20 GiB per share."); return;
     }
     setBusy(true); setMessage(""); setProgress(0);
     let draftId = "";
@@ -94,7 +83,7 @@ export function DropManager({ organizationId, organizationName, projects, drops,
   return <div className="space-y-6">
     <form onSubmit={upload} className="space-y-5 rounded-xl border p-4 sm:p-6">
       <div><h2 className="text-lg font-semibold">Create a share</h2><p className="text-sm text-muted-foreground">Organization: {organizationName} · Change organization in the sidebar.</p></div>
-      <p className="text-sm text-muted-foreground">Choose up to 200 files or a folder. Each file can be up to 5 GiB, with 20 GiB per share. Empty folders cannot be included.</p>
+      <p className="text-sm text-muted-foreground">Choose 1–{MAX_SHARE_FILES} files or a folder. Each file can be {formatSize(MIN_FILE_BYTES)} to {formatSize(MAX_SHARE_FILE_BYTES)}, with up to {formatSize(MAX_SHARE_BYTES)} per share. The folder picker includes files in subfolders.</p>
       <div className="flex flex-wrap items-end gap-3">
         <label className="block min-w-0 flex-1 space-y-2"><span className="text-sm font-medium">Files</span><input className="block w-full min-w-0 rounded border p-2 text-sm" type="file" multiple onChange={event => { selectFiles(event.target.files); event.target.value = ""; }} disabled={busy} /></label>
         <input ref={folderInput} type="file" className="hidden" multiple {...({ webkitdirectory: "" } as React.InputHTMLAttributes<HTMLInputElement>)} onChange={event => { selectFiles(event.target.files); event.target.value = ""; }} disabled={busy} />

@@ -11,7 +11,7 @@ type Props = {
 };
 
 export function DeleteProjectButton({ projectId, canDelete }: Props) {
-  const [, formAction, isPending] = useActionState<ActionResult, FormData>(
+  const [state, formAction, isPending] = useActionState<ActionResult, FormData>(
     projectsAction,
     {},
   );
@@ -31,6 +31,7 @@ export function DeleteProjectButton({ projectId, canDelete }: Props) {
       >
         {isPending ? "Deleting..." : "Delete"}
       </Button>
+      {state?.error && <p role="alert" className="mt-2 text-sm text-destructive">{state.error}</p>}
     </form>
   );
 }

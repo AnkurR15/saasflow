@@ -5,9 +5,11 @@ import { signIn, signOut } from "@/auth";
 import { authServerSchema } from "./auth-schema.server";
 import { ActionResult } from "@repo/types";
 import { retrieveUserFromDatabaseByEmail, saveUserToDatabase } from "./auth-model";
-import { hashPassword, verifyPassword } from "./auth-helpers.server";
+import { hashPassword } from "./auth-helpers.server";
 import { safeRedirect } from "./redirect";
-import { AuthError } from "next-auth";
+import { AuthError, CredentialsSignin } from "next-auth";
+import { headers } from "next/headers";
+import { checkRateLimit } from "@repo/auth/rate-limit";
 import { Prisma } from "@repo/db";
 
 export async function authAction(
@@ -28,23 +30,13 @@ export async function authAction(
             const { email, password } = parsed.data;
             const normalizedEmail = email.toLowerCase()
 
-            const user = await retrieveUserFromDatabaseByEmail(normalizedEmail)
-
-            if (!user) return {
-                error: "Invalid email or password"
-            }
-
-            const valid = await verifyPassword(password, user.password)
-
-            if (!valid) return {
-                error: "Invalid email or password"
-            }
-
             try { await signIn("credentials", {
                 email: normalizedEmail,
                 password,
                 redirect: false
             }) } catch (error) {
+                if (error instanceof CredentialsSignin && error.code === "rate_limit") return { error: "Too many sign-in attempts. Try again in a minute." };
+                if (error instanceof CredentialsSignin && error.code === "unavailable") return { error: "Sign-in is temporarily unavailable." };
                 if (error instanceof AuthError) return { error: "Invalid email or password" };
                 throw error;
             }
@@ -54,6 +46,8 @@ export async function authAction(
 
         case "sign-up": {
             const { email, password, confirmPassword } = parsed.data;
+            const rejected = await checkRateLimit("signUp", await headers());
+            if (rejected) return { error: rejected.message };
 
             if (password !== confirmPassword) return {
                 error: "Passwords do not match"
@@ -78,11 +72,12 @@ export async function authAction(
                 throw error;
             }
 
-            await signIn("credentials", {
-                email: normalizedEmail,
-                password,
-                redirect: false
-            })
+            try {
+                await signIn("credentials", { email: normalizedEmail, password, redirect: false });
+            } catch (error) {
+                if (error instanceof AuthError) return { error: "Account created. Please sign in again in a minute." };
+                throw error;
+            }
 
             redirect(safeRedirect(formData.get("redirectTo")))
         }

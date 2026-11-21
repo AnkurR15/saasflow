@@ -29,12 +29,32 @@ export function sendChunk(url: string, blob: Blob, index: number, progress: (byt
     };
     xhr.upload.onload = () => deadline(RESPONSE_TIMEOUT_MS);
     xhr.onload = () => {
-      if (xhr.status >= 200 && xhr.status < 300) finish();
-      else { let message = "Upload failed."; try { message = JSON.parse(xhr.responseText).error || message; } catch { /* keep default */ } finish(Object.assign(new Error(message), { retryable: xhr.status >= 500 })); }
+      if (xhr.status >= 200 && xhr.status < 300) return finish();
+      let message = "Upload failed.";
+      try { message = JSON.parse(xhr.responseText).error || message; } catch { /* A proxy may return HTML. */ }
+      const seconds = Number(xhr.getResponseHeader("Retry-After"));
+      finish(Object.assign(new Error(message), {
+        retryable: xhr.status === 429 || xhr.status >= 500,
+        retryAfterMs: Number.isFinite(seconds) ? Math.min(60, Math.max(0, seconds)) * 1000 : 0,
+      }));
     };
     xhr.onerror = () => finish(Object.assign(new Error("Upload interrupted. Please try again."), { retryable: true }));
     xhr.onabort = () => finish(Object.assign(new Error("Upload interrupted. Please try again."), { retryable: true }));
     deadline(UPLOAD_IDLE_MS);
     try { xhr.send(blob); } catch (error) { finish(error instanceof Error ? error : new Error("Upload failed.")); }
   });
+}
+
+export async function uploadChunk(url: string, blob: Blob, index: number, progress: (bytes: number) => void) {
+  for (let attempt = 0; ; attempt++) {
+    try {
+      await sendChunk(url, blob, index, progress);
+      return;
+    } catch (error) {
+      if (attempt >= 2 || !(error instanceof Error && "retryable" in error && error.retryable)) throw error;
+      const backoff = 1000 * (attempt + 1);
+      const retryAfter = "retryAfterMs" in error && typeof error.retryAfterMs === "number" ? error.retryAfterMs : 0;
+      await new Promise(resolve => setTimeout(resolve, Math.max(backoff, retryAfter)));
+    }
+  }
 }

@@ -4,6 +4,9 @@ This branch descends from `t3/secure-file-sharing-improvements`, including its
 Secure Drop implementation and the preceding uncommitted hardening changes.
 All 17 original `page.tsx` files were reviewed; the project edit page is new.
 
+This is a historical review. The [current README](../README.md) covers
+chunked sharing, verified transfer boundaries and distributed rate limiting.
+
 ## Page coverage
 
 ### Web (port 3000)

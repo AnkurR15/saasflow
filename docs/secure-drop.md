@@ -4,8 +4,8 @@ Organization members can share files or a selected folder with an expiring
 bearer link. Select an organization in the sidebar, open **Secure Drop**, and
 optionally associate the share with a project in that organization. Uploads
 accept ordinary business file types, including documents, spreadsheets, PDFs,
-images and archives. A share can contain 1–200 non-empty files, each up to
-5 GiB, and up to 20 GiB in total. Folder paths are preserved; browsers do not
+images and archives. A share can contain 1–200 files, from **1 byte to
+5 GiB per file**, and up to **20 GiB in total**. Folder paths are preserved; browsers do not
 supply empty directories through the folder picker.
 
 Choose a lifetime of 1 hour, 24 hours or 7 days and either multiple downloads
@@ -64,7 +64,10 @@ upload attempts may leave unreferenced encrypted chunks until their share is
 cleaned up. The reservation is based on declared file sizes, not actual disk
 usage; failed attempts, encryption overhead, legacy drops, and orphaned
 directories can consume additional space. Use volume quotas and service-wide
-rate and concurrency limits to bound physical disk usage.
+concurrency limits to bound physical disk usage. Account-based request budgets
+apply separately to creation, management and chunk upload, so a large share
+can use its full reservation. The sender retries a throttled chunk after the
+server's retry interval.
 
 Existing legacy single-file links continue to work. Their database ciphertext
 is cleared on expiry, revocation or one-time download, as before.
@@ -80,7 +83,9 @@ and authorized team members. Avoid logging request bodies and links.
 The completion check is **not malware scanning**. Files are not scanned or
 quarantined, and recipient identities are not verified. The server can decrypt
 files; this is not end-to-end encryption or the separate SecureDrop project.
-Anyone with the link can use it. Apply service-wide rate and concurrency limits,
+Anyone with the link can use it. The app limits credential checks, signups,
+uploads and recipient requests with Arcjet when configured and PostgreSQL
+otherwise. Configure a trusted ingress IP header for per-client public limits,
 monitor capacity, arrange malware scanning and abuse handling, and plan key
 rotation and backup retention before offering this as a public service. A
 storage failure during a one-time response may consume that file's claim.
@@ -89,4 +94,8 @@ Run `pnpm test` for unit tests and `pnpm lint` for lint. For database tests,
 apply migrations to a disposable PostgreSQL database, set
 `SECURE_DROP_TEST_DATABASE_URL`, and run `pnpm test:integration`. Set
 `RUN_APP_SMOKE=1` after building all apps to additionally exercise the HTTP
-flows. Without these settings the relevant suites are skipped.
+flows, including transfer of 1 byte and 200-file shares. With both settings,
+also set `RUN_SECURE_DROP_LARGE=1` to round-trip four real 5 GiB files in
+one 20 GiB share. The test checks each streamed download against the upload's
+SHA-256 digest. Without the relevant settings the corresponding checks are skipped.
+See the [repository README](../README.md) for environment variables and request budgets.

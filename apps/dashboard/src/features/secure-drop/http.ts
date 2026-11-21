@@ -1,5 +1,5 @@
 export class DropError extends Error {
-  constructor(public status: number, message: string) { super(message); }
+  constructor(public status: number, message: string, public retryAfter?: number) { super(message); }
 }
 
 export const privateHeaders = {
@@ -66,7 +66,11 @@ export async function readLimited(request: Request, limit: number) {
 }
 
 export function failure(error: unknown) {
-  if (error instanceof DropError) return Response.json({ error: error.message }, { status: error.status, headers: privateHeaders });
+  if (error instanceof DropError) {
+    const headers = new Headers(privateHeaders);
+    if (error.retryAfter) headers.set("Retry-After", String(error.retryAfter));
+    return Response.json({ error: error.message }, { status: error.status, headers });
+  }
   // Never log request bodies, bearer tokens, or Prisma errors containing payloads.
   return Response.json({ error: "Secure Drop is temporarily unavailable. Check server configuration or try again." }, { status: 503, headers: privateHeaders });
 }
