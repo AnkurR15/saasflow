@@ -1,10 +1,10 @@
 ﻿"use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { formatFileSize as formatSize } from "@repo/types";
 
 type FileItem = { id: string; path: string; size: number; downloaded: boolean };
 type Details = { organization: string; expiresAt: string; downloadOnce: boolean; legacy?: boolean; files: FileItem[] };
-function formatSize(size: number) { return size >= 1024 ** 3 ? `${(size / 1024 ** 3).toFixed(2)} GiB` : size >= 1024 ** 2 ? `${(size / 1024 ** 2).toFixed(1)} MiB` : `${(size / 1024).toFixed(1)} KiB`; }
 
 export function DropRecipient() {
   const [details, setDetails] = useState<Details | null>(null);

@@ -10,6 +10,7 @@ export async function retrieveAllOrganizationsFromDatabase() {
                     memberships: true,
                     projects: true,
                     fileDrops: true,
+                    secureShares: { where: { publishedAt: { not: null } } },
                 },
             },
         },

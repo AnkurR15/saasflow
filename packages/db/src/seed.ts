@@ -11,7 +11,8 @@ import {
 async function main() {
     const users = await Promise.all(
         Array.from({ length: 5 }, () => prisma.user.create({
-            data: createPopulatedUser(),
+            // Demo identities are display fixtures and have no usable credential.
+            data: createPopulatedUser({ password: "!" }),
         }))
     )
 

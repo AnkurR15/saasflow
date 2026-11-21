@@ -18,7 +18,7 @@ export default async function AdminOrganizationsPage() {
               <th className="pb-2">Name</th>
               <th className="pb-2">Members</th>
               <th className="pb-2">Projects</th>
-              <th className="pb-2">File drops</th>
+              <th className="pb-2">File shares</th>
               <th className="pb-2">Created</th>
             </tr>
           </thead>
@@ -35,7 +35,7 @@ export default async function AdminOrganizationsPage() {
                 </td>
                 <td className="py-3">{org._count.memberships}</td>
                 <td className="py-3">{org._count.projects}</td>
-                <td className="py-3">{org._count.fileDrops}</td>
+                <td className="py-3">{org._count.fileDrops + org._count.secureShares}</td>
                 <td className="py-3 text-muted-foreground">
                   {org.createdAt.toLocaleDateString()}
                 </td>

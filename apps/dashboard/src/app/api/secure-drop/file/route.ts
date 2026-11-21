@@ -1,12 +1,16 @@
 ﻿import { prisma } from "@repo/db";
 import { hashToken, TOKEN_PATTERN } from "@/features/secure-drop/crypto";
-import { CHUNK_BYTES, readChunk } from "@/features/secure-drop/storage";
+import { readChunk } from "@/features/secure-drop/storage";
+import { CHUNK_BYTES } from "@repo/types";
 import { DropError, failure, privateHeaders, readLimited, sameOrigin } from "@/features/secure-drop/http";
+
+import { limitDropRequest } from "@/features/secure-drop/rate-limit";
 
 export const runtime = "nodejs";
 export async function POST(request: Request) {
   try {
     sameOrigin(request, { allowSameOriginForm: true });
+    await limitDropRequest(request, "download");
     const form = new URLSearchParams((await readLimited(request, 1024)).toString("utf8"));
     const token = form.get("token") ?? "";
     const fileId = form.get("fileId") ?? "";

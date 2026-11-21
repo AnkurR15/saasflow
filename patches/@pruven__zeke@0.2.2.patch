@@ -1,0 +1,39 @@
+diff --git a/dist/lib/hook.js b/dist/lib/hook.js
+--- a/dist/lib/hook.js
++++ b/dist/lib/hook.js
+@@ -11,7 +11,12 @@ try {
+     let status = 0;
+     try {
+         fs.accessSync(previous, fs.constants.X_OK);
+-        const result = spawnSync(previous, args, { stdio: 'inherit' });
++        // Git's shell honors shebangs on Windows. Unlike hook run, a shell alias
++        // preserves live stdin and keeps protocol stdout separate from stderr.
++        // Pass paths/arguments positionally, and restore the caller's directory.
++        const result = process.platform === 'win32'
++            ? spawnSync('git', ['-c', 'alias.zeke-forward=!f() { cd -- "$1" && shift && exec "$@"; }; f', 'zeke-forward', process.cwd(), previous, ...args], { stdio: 'inherit' })
++            : spawnSync(previous, args, { stdio: 'inherit' });
+         if (result.error)
+             throw result.error;
+         if (result.signal) {
+diff --git a/dist/lib/zeke.js b/dist/lib/zeke.js
+index 16e5979a684f8d6de09d2bcc79cedd3712588d0a..b198411ad411b80845403079e0c7b189d6d631f2 100644
+--- a/dist/lib/zeke.js
++++ b/dist/lib/zeke.js
+@@ -210,7 +210,7 @@ function safeParents(root, relative, dryRun) {
+ }
+ function sourceAt(ctx, projectRoot, config) {
+     const source = fs.realpathSync(config.source === 'main-worktree' ? projectRoot : path.resolve(projectRoot, config.source));
+-    if (git(['rev-parse', '--show-toplevel'], source).trimEnd() !== source || git(['rev-parse', '--path-format=absolute', '--git-common-dir'], source).trimEnd() !== ctx.common) {
++    if (path.normalize(git(['rev-parse', '--show-toplevel'], source).trimEnd()) !== source || git(['rev-parse', '--path-format=absolute', '--git-common-dir'], source).trimEnd() !== ctx.common) {
+         throw new Error('source must be a worktree of this repository.');
+     }
+     return source;
+@@ -239,7 +239,7 @@ export function sync({ dryRun = false, verbose = false, all = false } = {}) {
+                 continue;
+             if (all)
+                 console.log(`zeke: worktree ${JSON.stringify(target)}`);
+-            if (all && (git(['rev-parse', '--show-toplevel'], target).trimEnd() !== fs.realpathSync(target) || git(['rev-parse', '--path-format=absolute', '--git-common-dir'], target).trimEnd() !== ctx.common)) {
++            if (all && (path.normalize(git(['rev-parse', '--show-toplevel'], target).trimEnd()) !== fs.realpathSync(target) || git(['rev-parse', '--path-format=absolute', '--git-common-dir'], target).trimEnd() !== ctx.common)) {
+                 throw new Error('destination must be a worktree of this repository.');
+             }
+             syncTarget(ctx, target, source, files, ignored, sourceSkipped, dryRun, verbose, total);

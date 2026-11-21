@@ -89,6 +89,14 @@ enum Role {
   ADMIN
 }
 
+model RequestRateLimit {
+  bucket    String   @id
+  hits      Int
+  expiresAt DateTime @db.Timestamptz(6)
+
+  @@index([expiresAt])
+}
+
 model FileDrop {
   id             String   @id @default(cuid())
   organizationId String

@@ -2,10 +2,13 @@
 import { hashToken, TOKEN_PATTERN } from "@/features/secure-drop/crypto";
 import { DropError, failure, privateHeaders, readLimited, sameOrigin } from "@/features/secure-drop/http";
 
+import { limitDropRequest } from "@/features/secure-drop/rate-limit";
+
 export const runtime = "nodejs";
 export async function POST(request: Request) {
   try {
     sameOrigin(request);
+    await limitDropRequest(request, "listFiles");
     const token = (await readLimited(request, 100)).toString("utf8");
     if (!TOKEN_PATTERN.test(token)) throw new DropError(404, "This share is unavailable.");
     const tokenHash = hashToken(token);

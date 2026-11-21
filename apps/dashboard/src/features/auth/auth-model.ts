@@ -4,9 +4,9 @@ import { prisma } from "@repo/db";
 export async function saveUserToDatabase(
     data: Prisma.UserCreateInput
 ) {
-    return prisma.user.create({ data })
+    return prisma.user.create({ data, select: { id: true } })
 }
 
 export async function retrieveUserFromDatabaseByEmail(email: string) {
-    return prisma.user.findUnique({ where: { email } })
+    return prisma.user.findUnique({ where: { email }, select: { id: true } })
 }

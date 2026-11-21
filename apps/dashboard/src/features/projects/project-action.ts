@@ -1,82 +1,35 @@
 "use server";
 
-import { redirect } from "next/navigation";
-import { projectsServerSchema } from "./project-schema.server";
-import {
-    saveProjectToDatabase,
-    updateProjectInDatabase,
-    deleteProjectFromDatabase,
-    retrieveProjectFromDatabase,
-} from "./project.model";
-import { requireUserIsAuthenticated } from "@/features/auth/auth-helpers.server";
-import { requireUserIsOrgMember } from "@/features/organizations/organization-helpers.server";
-import { requireUserCanDeleteProject } from "./project-helpers.server";
-import { retrieveOrganizationFromDatabase } from "@/features/organizations/organization.model";
+import { Prisma } from "@repo/db";
 import type { ActionResult } from "@repo/types";
+import { redirect } from "next/navigation";
+import { requireUserIsAuthenticated } from "@/features/auth/auth-helpers.server";
+import { projectsServerSchema } from "./project-schema.server";
+import { deleteProjectFromDatabase, saveProjectToDatabase, updateProjectInDatabase } from "./project.model";
 
-export async function projectsAction(
-    _previous: ActionResult,
-    formData: FormData,
-): Promise<ActionResult> {
-
-    const raw = Object.fromEntries(formData.entries());
-    const parsed = projectsServerSchema.safeParse(raw);
-
-    if (!parsed.success) {
-        return { error: "Invalid input" };
-    }
-
-    const { intent } = parsed.data;
-
+export async function projectsAction(_previous: ActionResult, formData: FormData): Promise<ActionResult> {
+    const parsed = projectsServerSchema.safeParse(Object.fromEntries(formData));
+    if (!parsed.success) return { error: "Invalid input" };
     const { userId } = await requireUserIsAuthenticated();
-
-    switch (intent) {
-        case "create-project": {
-            const { name, description, organizationId } = parsed.data;
-
-            await requireUserIsOrgMember(organizationId, userId);
-            const [org] = await Promise.all([
-                retrieveOrganizationFromDatabase(organizationId),
-                saveProjectToDatabase({
-                    name,
-                    description,
-                    organization: { connect: { id: organizationId } },
-                    createdBy: { connect: { id: userId } },
-                }),
-            ]);
-
-            redirect(`/dashboard/organizations/${org?.slug}/projects`);
+    const input = parsed.data;
+    let result;
+    try {
+        switch (input.intent) {
+            case "create-project":
+                result = await saveProjectToDatabase(input.organizationId, userId, { name: input.name, description: input.description });
+                break;
+            case "update-project":
+                result = await updateProjectInDatabase(input.id, userId, { name: input.name, description: input.description });
+                break;
+            case "delete-project":
+                result = await deleteProjectFromDatabase(input.id, userId);
+                break;
         }
-
-        case "update-project": {
-            const { id, name, description } = parsed.data;
-
-            const project = await retrieveProjectFromDatabase(id);
-            if (!project) return { error: "Project not found" };
-
-            await requireUserIsOrgMember(project.organizationId, userId);
-            const [org] = await Promise.all([
-                retrieveOrganizationFromDatabase(project.organizationId),
-                updateProjectInDatabase(id, { name, description }),
-            ]);
-            redirect(`/dashboard/organizations/${org?.slug}/projects`);
+    } catch (error) {
+        if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2025") {
+            return { error: "The project or organization is unavailable, or your role does not allow this change." };
         }
-
-        case "delete-project": {
-            const { id } = parsed.data;
-
-            const { project } = await requireUserCanDeleteProject({ userId, projectId: id });
-            const [org] = await Promise.all([
-                retrieveOrganizationFromDatabase(project.organizationId),
-                deleteProjectFromDatabase(id),
-            ]);
-
-            redirect(`/dashboard/organizations/${org?.slug}/projects`);
-        }
-
-        default: {
-            return { error: "Invalid intent" };
-        }
+        throw error;
     }
-
+    redirect(`/dashboard/organizations/${result.organization.slug}/projects`);
 }

@@ -1,7 +1,8 @@
 ﻿import { prisma } from "@repo/db";
-import { authorizeShare } from "@/features/secure-drop/share-auth";
+import { authorizeShare, lockShareMembership } from "@/features/secure-drop/share-auth";
 import { DropError, failure, privateHeaders, readLimited } from "@/features/secure-drop/http";
-import { MAX_ORGANIZATION_BYTES, MAX_SHARE_BYTES, MAX_SHARE_FILE_BYTES, MAX_SHARE_FILES, parseRelativePath, prepareStorage } from "@/features/secure-drop/storage";
+import { MAX_ORGANIZATION_BYTES, parseRelativePath, prepareStorage } from "@/features/secure-drop/storage";
+import { MIN_FILE_BYTES, MAX_SHARE_BYTES, MAX_SHARE_FILE_BYTES, MAX_SHARE_FILES } from "@repo/types";
 
 export const runtime = "nodejs";
 type Context = { params: Promise<{ organizationId: string }> };
@@ -9,14 +10,15 @@ type Context = { params: Promise<{ organizationId: string }> };
 export async function POST(request: Request, context: Context) {
   try {
     const { organizationId } = await context.params;
-    const member = await authorizeShare(request, organizationId);
+    const member = await authorizeShare(request, organizationId, "createShare");
     let input: { files?: { path?: unknown; size?: unknown }[]; projectId?: unknown; hours?: unknown; downloadOnce?: unknown };
-    try { input = JSON.parse((await readLimited(request, 256 * 1024)).toString("utf8")); }
+    // JSON escaping can expand a valid path to six bytes per character.
+    try { input = JSON.parse((await readLimited(request, MAX_SHARE_FILES * (6 * 1024 + 128) + 1024)).toString("utf8")); }
     catch (error) { if (error instanceof DropError) throw error; throw new DropError(400, "Invalid share details."); }
     if (!input || !Array.isArray(input.files) || !input.files.length || input.files.length > MAX_SHARE_FILES) throw new DropError(400, `Select between 1 and ${MAX_SHARE_FILES} files.`);
     if (![1, 24, 168].includes(Number(input.hours)) || typeof input.downloadOnce !== "boolean") throw new DropError(400, "Choose a valid expiry and download option.");
     const files = input.files.map(file => {
-      if (!file || !Number.isSafeInteger(file.size) || Number(file.size) <= 0 || Number(file.size) > MAX_SHARE_FILE_BYTES) throw new DropError(400, "Each file must be non-empty and no larger than 5 GiB.");
+      if (!file || !Number.isSafeInteger(file.size) || Number(file.size) < MIN_FILE_BYTES || Number(file.size) > MAX_SHARE_FILE_BYTES) throw new DropError(400, "Each file must be between 1 byte and 5 GiB.");
       return { path: parseRelativePath(file.path), size: BigInt(Number(file.size)) };
     });
     if (new Set(files.map(file => file.path)).size !== files.length) throw new DropError(400, "Each file must have a unique path.");
@@ -26,6 +28,7 @@ export async function POST(request: Request, context: Context) {
     await prepareStorage();
     const share = await prisma.$transaction(async tx => {
       await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`secure-share-org:${organizationId}`}))`;
+      await lockShareMembership(tx, member.id);
       if (input.projectId && !await tx.project.findFirst({ where: { id: input.projectId as string, organizationId }, select: { id: true } })) throw new DropError(400, "Project does not belong to this organization.");
       const now = new Date();
       const active = { organizationId, revokedAt: null, expiresAt: { gt: now } };

@@ -2,14 +2,17 @@
     "name": "saasflow",
     "packageManager": "pnpm@10.12.1",
     "private": true,
+    "engines": { "node": "^22.21.0 || ^24.12.0 || >=26.0.0" },
     "scripts": {
         "dev": "turbo dev",
         "build": "turbo build",
         "lint": "pnpm -r --if-present lint",
         "test": "pnpm --filter @repo/db test:secure-drop",
+        "test:hooks": "node --test tests/windows-hook-forwarding.test.mjs",
         "test:integration": "pnpm --filter @repo/db test:secure-drop:integration"
     },
     "devDependencies": {
+        "@pruven/zeke": "0.2.2",
         "turbo": "^2.10.12"
     }
 }

@@ -13,7 +13,7 @@
   "scripts": {
     "db:generate": "prisma generate",
     "db:drop-cleanup": "tsx src/secure-drop-cleanup.ts",
-    "test:secure-drop": "tsx --test ../../apps/dashboard/src/features/secure-drop/secure-drop.test.ts ../../apps/dashboard/src/features/secure-drop/chunk-upload.test.ts ../../apps/dashboard/src/features/auth/redirect.test.ts ../../apps/admin/src/features/auth/admin-policy.test.ts",
+    "test:secure-drop": "tsx --test ../../apps/dashboard/src/features/secure-drop/secure-drop.test.ts ../../apps/dashboard/src/features/secure-drop/chunk-upload.test.ts ../../apps/dashboard/src/features/auth/*.test.ts ../../apps/admin/src/features/auth/admin-policy.test.ts",
     "test:secure-drop:integration": "tsx --tsconfig ../../apps/dashboard/tsconfig.json --test ../../apps/dashboard/src/features/secure-drop/*.integration.test.ts",
     "db:migrate": "prisma migrate dev",
     "db:studio": "prisma studio",
@@ -26,14 +26,14 @@
   "devDependencies": {
     "@types/node": "^20.19.43",
     "@types/pg": "^8.23.1",
-    "prisma": "7.10.0",
+    "prisma": "7.10.1",
     "tsx": "^4.23.13"
   },
   "dependencies": {
     "@faker-js/faker": "^10.6.0",
     "@paralleldrive/cuid2": "^3.3.0",
-    "@prisma/adapter-pg": "^7.10.0",
-    "@prisma/client": "^7.10.0",
+    "@prisma/adapter-pg": "^7.10.1",
+    "@prisma/client": "^7.10.1",
     "dotenv": "^17.4.2",
     "pg": "^8.23.0"
   }
