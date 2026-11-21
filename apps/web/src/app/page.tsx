@@ -361,6 +361,61 @@ export default function HomePage() {
             </div>
           </div>
           <div className={styles.faqs}>
+            <details open>
+              <summary>What files can I send?</summary>
+              <p>
+                Any file type: PDFs, Word documents, spreadsheets,
+                presentations, photos, audio, videos, ZIP/RAR/7Z archives,
+                source code and even software such as EXE or APK files. There is
+                no file-extension or content-type restriction. Select individual
+                files or a folder; folder paths are preserved, but empty folders
+                are omitted.
+              </p>
+              <p>
+                Each file must be {formatFileSize(MIN_FILE_BYTES)} to{" "}
+                {formatFileSize(MAX_SHARE_FILE_BYTES)}. A share supports up to{" "}
+                {MAX_SHARE_FILES} files and {formatFileSize(MAX_SHARE_BYTES)}{" "}
+                total. Empty files, oversized selections, duplicate file paths,
+                unsafe names or paths, and uploads exceeding organization quotas
+                are rejected. Files are not scanned for malware: only open files
+                from senders you trust.
+              </p>
+            </details>
+            <details>
+              <summary>How does Secure Drop work behind the scenes?</summary>
+              <p>
+                Your browser splits files into 4 MiB pieces and uploads them to
+                the SaaSFlow server. The server checks your team membership,
+                file sizes and piece order, then encrypts the pieces on private
+                disk. PostgreSQL stores file details and upload progress. Once
+                every file is ready, you receive an expiring link.
+              </p>
+              <p>
+                When a recipient opens the link, the server checks access,
+                decrypts the pieces and streams the selected file to their
+                browser. Scheduled cleanup removes eligible expired or revoked
+                files. This is server-stored sharing, not a direct transfer
+                between devices. The sender can go offline after uploading.
+              </p>
+            </details>
+            <details>
+              <summary>When is it useful, and is it faster?</summary>
+              <p>
+                Deliver client assets, project folders or team documents without
+                asking recipients to install an app or create an account. Keep
+                handoffs connected to a project, choose an expiry and revoke
+                future access when needed. Downloaded copies cannot be recalled.
+              </p>
+              <p>
+                Small upload pieces allow progress updates and retries, while
+                streaming avoids loading a whole large file into server memory.
+                Uploads are sequential; speed depends on your connection and the
+                server’s bandwidth, disk and database. There is no benchmark
+                showing it is faster than other sharing tools. Closing the
+                browser ends an unfinished upload; returning later does not
+                resume it.
+              </p>
+            </details>
             <details>
               <summary>What does “secure” mean here?</summary>
               <p>
@@ -368,7 +423,8 @@ export default function HomePage() {
                 decrypt them for delivery. Share tokens are stored as hashes.
                 File names and sizes remain visible to the service. Anyone
                 holding a link has access: keep it private. Recipient identity
-                is not verified, and files are not scanned for malware.
+                is not verified, and files are not scanned for malware. This is
+                encryption at rest, not end-to-end file encryption.
               </p>
             </details>
             <details>
@@ -444,6 +500,12 @@ export default function HomePage() {
                   the link without Tailscale.
                 </p>
               </div>
+              <p className={styles.networkNote}>
+                Taildrop is Tailscale’s file-transfer feature for your own
+                personal devices running Tailscale. Secure Drop instead stores
+                files on the SaaSFlow server for later browser downloads; it
+                does not use Taildrop or peer-to-peer transfers.
+              </p>
               <p className={styles.networkNote}>
                 SaaSFlow sign-in and roles still apply. Configure the deployed
                 app URLs and Secure Drop origin to match your host.

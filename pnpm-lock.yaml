@@ -15,7 +15,7 @@ overrides:
 
 patchedDependencies:
   '@pruven/zeke@0.2.2':
-    hash: 59e2c4eb1baa54a9ba7a0b6ec239a371c6702aabdb271a387f56a6cc8e3f2230
+    hash: b6c242dda7503b0680d687d3845a7257c8fac114640f500963856e363349afc9
     path: patches/@pruven__zeke@0.2.2.patch
 
 importers:
@@ -24,7 +24,7 @@ importers:
     devDependencies:
       '@pruven/zeke':
         specifier: 0.2.2
-        version: 0.2.2(patch_hash=59e2c4eb1baa54a9ba7a0b6ec239a371c6702aabdb271a387f56a6cc8e3f2230)
+        version: 0.2.2(patch_hash=b6c242dda7503b0680d687d3845a7257c8fac114640f500963856e363349afc9)
       turbo:
         specifier: ^2.10.12
         version: 2.10.12
@@ -4807,7 +4807,7 @@ snapshots:
     transitivePeerDependencies:
       - '@types/react-dom'
 
-  '@pruven/zeke@0.2.2(patch_hash=59e2c4eb1baa54a9ba7a0b6ec239a371c6702aabdb271a387f56a6cc8e3f2230)': {}
+  '@pruven/zeke@0.2.2(patch_hash=b6c242dda7503b0680d687d3845a7257c8fac114640f500963856e363349afc9)': {}
 
   '@radix-ui/number@1.1.3': {}
 
